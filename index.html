@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>L&B Cattery | Booking & Reservations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand-wrap">
+        <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
+        <div>
+          <p class="eyebrow">Cat Hotel & Care</p>
+          <h1>L&B Cattery Booking Desk</h1>
+          <p class="brand-tagline">Safe. Comfy. Loved.</p>
+        </div>
+      </div>
+      <p class="intro">
+        Plan your cat's stay with transparent rates, suite-based availability checks, and quick reservation tracking.
+      </p>
+    </header>
+
+    <main class="layout">
+      <section class="card" id="booking-card">
+        <h2>Create Reservation</h2>
+        <p id="form-mode" class="form-mode">You are creating a new booking.</p>
+        <form id="booking-form">
+          <div class="grid two">
+            <label>
+              Owner name
+              <input type="text" name="ownerName" required />
+            </label>
+            <label>
+              Contact email
+              <input type="email" name="ownerEmail" required />
+            </label>
+            <label>
+              Contact phone
+              <input type="tel" name="ownerPhone" required />
+            </label>
+            <label>
+              Cat name
+              <input type="text" name="catName" required />
+            </label>
+            <label>
+              Breed
+              <input type="text" name="breed" required />
+            </label>
+            <label>
+              Age (years)
+              <input type="number" name="age" min="0" max="30" step="0.5" required />
+            </label>
+            <label>
+              Check-in
+              <input type="date" name="checkIn" required />
+            </label>
+            <label>
+              Check-out
+              <input type="date" name="checkOut" required />
+            </label>
+            <label>
+              Suite type
+              <select name="suiteType" required>
+                <option value="standard">Standard Suite</option>
+                <option value="deluxe">Deluxe Suite</option>
+                <option value="royal">Royal Suite</option>
+              </select>
+            </label>
+            <label>
+              Add-ons
+              <select name="addOn">
+                <option value="none">No add-on</option>
+                <option value="grooming">Grooming Package</option>
+                <option value="playtime">Extended Playtime</option>
+                <option value="medication">Medication Support</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Special care notes
+            <textarea name="notes" rows="3" placeholder="Diet, medication, behavior, preferences"></textarea>
+          </label>
+
+          <div class="price-panel">
+            <div>
+              <p class="price-label">Estimated total</p>
+              <p id="estimated-total" class="price-value">RM0.00</p>
+            </div>
+            <div class="actions-row">
+              <button type="submit" id="submit-booking">Confirm Reservation</button>
+              <button type="button" id="cancel-edit" class="secondary" hidden>Cancel Edit</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section class="card" id="availability-card">
+        <h2>Availability Checker</h2>
+        <div class="grid two">
+          <label>
+            Suite type
+            <select id="availability-suite">
+              <option value="standard">Standard Suite</option>
+              <option value="deluxe">Deluxe Suite</option>
+              <option value="royal">Royal Suite</option>
+            </select>
+          </label>
+          <label>
+            Desired check-in
+            <input type="date" id="availability-start" />
+          </label>
+          <label>
+            Desired check-out
+            <input type="date" id="availability-end" />
+          </label>
+        </div>
+        <button id="check-availability" class="secondary availability-action">Check Dates</button>
+        <p id="availability-result" class="status" aria-live="polite"></p>
+        <div id="blocked-ranges" class="blocked-ranges"></div>
+
+        <h3>Price Guide</h3>
+        <ul class="price-guide">
+          <li>Standard Suite: RM20 per night</li>
+          <li>Deluxe Suite: RM35 per night</li>
+          <li>Royal Suite: RM55 per night</li>
+          <li>Grooming Package: +RM18 booking fee</li>
+          <li>Extended Playtime: +RM10 per night</li>
+          <li>Medication Support: +RM12 booking fee</li>
+        </ul>
+
+        <h3>Monthly Availability</h3>
+        <div class="calendar-toolbar">
+          <button id="cal-prev" type="button" class="secondary">Prev</button>
+          <p id="calendar-title" class="calendar-title"></p>
+          <button id="cal-next" type="button" class="secondary">Next</button>
+        </div>
+        <div id="availability-calendar" class="availability-calendar" aria-live="polite"></div>
+      </section>
+
+      <section class="card wide" id="reservations-card">
+        <h2>Upcoming Reservations</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Booking ID</th>
+                <th>Owner</th>
+                <th>Cat</th>
+                <th>Dates</th>
+                <th>Suite</th>
+                <th>Total</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="reservation-list"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <template id="reservation-row-template">
+      <tr>
+        <td data-key="id"></td>
+        <td data-key="owner"></td>
+        <td data-key="cat"></td>
+        <td data-key="dates"></td>
+        <td data-key="suite"></td>
+        <td data-key="total"></td>
+        <td data-key="notes"></td>
+        <td data-key="actions"></td>
+      </tr>
+    </template>
+
+    <script src="script.js"></script>
+  </body>
+</html>
