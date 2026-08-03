@@ -1,7 +1,4 @@
-// Replace SUPABASE_ANON_KEY with your actual anon public key from Supabase → Settings → API
-const SUPABASE_URL = "https://vphwrascfqwldakdvpxe.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_REf8jGyNBwJ-PuyHmfgwlQ_FnbTLBKL";
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 
 const pricing = {
   suites: {
@@ -67,8 +64,9 @@ function formatMoney(value) {
 }
 
 async function getBookings() {
-  const { data, error } = await db.from("bookings").select("*");
-  if (error) { console.error(error); return []; }
+  const res = await fetch("/api/bookings");
+  if (!res.ok) { console.error("getBookings failed", res.status); return []; }
+  const data = await res.json();
   return data.map(r => ({
     id: r.id,
     ownerName: r.owner_name,
@@ -87,27 +85,31 @@ async function getBookings() {
 }
 
 async function saveBooking(booking) {
-  const { error } = await db.from("bookings").upsert({
-    id: booking.id,
-    owner_name: booking.ownerName,
-    owner_email: booking.ownerEmail,
-    owner_phone: booking.ownerPhone,
-    cat_name: booking.catName,
-    breed: booking.breed,
-    age: booking.age,
-    suite_type: booking.suiteType,
-    check_in: booking.checkIn,
-    check_out: booking.checkOut,
-    add_on: booking.addOn,
-    total_price: booking.totalPrice,
-    notes: booking.notes || null,
+  const res = await fetch("/api/bookings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: booking.id,
+      owner_name: booking.ownerName,
+      owner_email: booking.ownerEmail,
+      owner_phone: booking.ownerPhone,
+      cat_name: booking.catName,
+      breed: booking.breed,
+      age: booking.age,
+      suite_type: booking.suiteType,
+      check_in: booking.checkIn,
+      check_out: booking.checkOut,
+      add_on: booking.addOn,
+      total_price: booking.totalPrice,
+      notes: booking.notes || null,
+    }),
   });
-  if (error) console.error(error);
+  if (!res.ok) console.error("saveBooking failed", res.status);
 }
 
 async function deleteBooking(id) {
-  const { error } = await db.from("bookings").delete().eq("id", id);
-  if (error) console.error(error);
+  const res = await fetch(`/api/bookings?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) console.error("deleteBooking failed", res.status);
 }
 
 function datesOverlap(aStart, aEnd, bStart, bEnd) {
