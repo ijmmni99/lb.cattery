@@ -482,6 +482,47 @@ th {
   gap: 1rem;
 }
 
+.admin-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.admin-sidebar-card {
+  position: sticky;
+  top: 1rem;
+}
+
+.admin-nav {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.admin-nav-btn {
+  text-align: left;
+  background: #fff7e4;
+  color: var(--brand-ink);
+  border: 1px solid var(--brand-border);
+  min-height: 40px;
+  padding: 0.55rem 0.75rem;
+}
+
+.admin-nav-btn.active {
+  background: var(--brand-primary);
+  color: #fff;
+  border-color: transparent;
+}
+
+.admin-main-panels {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-panel[hidden] {
+  display: none;
+}
+
 .admin-page .admin-workspace[hidden],
 .admin-page #admin-login-card[hidden] {
   display: none !important;
@@ -630,6 +671,18 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar-card {
+    position: static;
+  }
+
+  .admin-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .admin-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -757,5 +810,9 @@ th {
 
   .row-actions {
     gap: 0.5rem;
+  }
+
+  .admin-nav {
+    grid-template-columns: 1fr;
   }
 }

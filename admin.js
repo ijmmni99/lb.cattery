@@ -24,6 +24,13 @@ const logoutBtn = document.getElementById("admin-logout");
 const loginCardEl = document.getElementById("admin-login-card");
 const statusEl = document.getElementById("admin-status");
 const workspaceEl = document.getElementById("admin-workspace");
+const workspaceStatusEl = document.getElementById("admin-workspace-status");
+const upcomingRowsEl = document.getElementById("upcoming-bookings-rows");
+const upcomingStatusEl = document.getElementById("upcoming-status");
+const refreshUpcomingBtn = document.getElementById("refresh-upcoming");
+const navEl = document.getElementById("admin-nav");
+const navButtons = Array.from(document.querySelectorAll(".admin-nav-btn"));
+const panels = Array.from(document.querySelectorAll(".admin-panel"));
 
 const allowPublicBookingEl = document.getElementById("allow-public-booking");
 const minNightsEl = document.getElementById("min-nights");
@@ -54,6 +61,18 @@ function showStatus(message, ok) {
   statusEl.classList.add(ok ? "ok" : "warn");
 }
 
+function showWorkspaceStatus(message, ok) {
+  workspaceStatusEl.textContent = message;
+  workspaceStatusEl.classList.remove("ok", "warn");
+  workspaceStatusEl.classList.add(ok ? "ok" : "warn");
+}
+
+function showUpcomingStatus(message, ok) {
+  upcomingStatusEl.textContent = message;
+  upcomingStatusEl.classList.remove("ok", "warn");
+  upcomingStatusEl.classList.add(ok ? "ok" : "warn");
+}
+
 function setWorkspaceVisible(visible) {
   workspaceEl.hidden = !visible;
   saveSettingsBtn.disabled = !visible;
@@ -68,6 +87,29 @@ function setLoginCardVisible(visible) {
 function getAuthHeaders() {
   const token = getAdminToken();
   return token ? { "x-admin-token": token } : {};
+}
+
+function parseDate(dateString) {
+  return new Date(`${dateString}T00:00:00`);
+}
+
+function formatMoney(value) {
+  return new Intl.NumberFormat("ms-MY", {
+    style: "currency",
+    currency: "MYR",
+    maximumFractionDigits: 2,
+  }).format(Number(value) || 0);
+}
+
+function setActivePanel(panelId) {
+  panels.forEach((panel) => {
+    panel.hidden = panel.id !== panelId;
+  });
+
+  navButtons.forEach((button) => {
+    const isActive = button.dataset.target === panelId;
+    button.classList.toggle("active", isActive);
+  });
 }
 
 function createCellInput(value, type = "text", step = "0.01") {
@@ -162,6 +204,55 @@ async function fetchSettings() {
   return await res.json();
 }
 
+async function fetchBookings() {
+  const res = await fetch("/api/bookings");
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+function renderUpcomingBookings(rows) {
+  upcomingRowsEl.innerHTML = "";
+
+  if (!rows.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="7">No upcoming bookings found.</td>';
+    upcomingRowsEl.appendChild(tr);
+    return;
+  }
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    const ownerLabel = `${row.owner_name || "-"} (${row.owner_phone || "-"})`;
+    const catLabel = `${row.cat_name || "-"} (${row.breed || "-"}, ${row.age ?? "-"}y)`;
+    const dateLabel = `${row.check_in || "-"} to ${row.check_out || "-"}`;
+
+    tr.innerHTML = `
+      <td>${row.id || "-"}</td>
+      <td>${ownerLabel}</td>
+      <td>${catLabel}</td>
+      <td>${dateLabel}</td>
+      <td>${row.suite_type || "-"}</td>
+      <td>${formatMoney(row.total_price)}</td>
+      <td>${row.notes || "-"}</td>
+    `;
+
+    upcomingRowsEl.appendChild(tr);
+  });
+}
+
+async function loadUpcomingBookings() {
+  const rows = await fetchBookings();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const upcoming = rows
+    .filter((row) => row.check_out && parseDate(row.check_out) >= today)
+    .sort((a, b) => parseDate(a.check_in || "2100-01-01") - parseDate(b.check_in || "2100-01-01"));
+
+  renderUpcomingBookings(upcoming);
+  showUpcomingStatus(`Showing ${upcoming.length} upcoming booking(s).`, true);
+}
+
 async function login() {
   const username = usernameInput.value.trim();
   const password = passwordInput.value;
@@ -188,9 +279,12 @@ async function login() {
   passwordInput.value = "";
   setLoginCardVisible(false);
   setWorkspaceVisible(true);
+  setActivePanel("panel-upcoming");
   showStatus("Signed in as administrator.", true);
+  showWorkspaceStatus("Select a section on the left to manage configuration.", true);
   const settings = await fetchSettings();
   applySettingsToForm(settings);
+  await loadUpcomingBookings();
 }
 
 function logout() {
@@ -249,12 +343,12 @@ async function saveSettings() {
   });
 
   if (res.ok) {
-    showStatus("Settings saved successfully.", true);
+    showWorkspaceStatus("Settings saved successfully.", true);
   } else if (res.status === 401) {
     logout();
     showStatus("Session expired. Please sign in again.", false);
   } else {
-    showStatus("Failed to save settings. Check backend logs/table setup.", false);
+    showWorkspaceStatus("Failed to save settings. Check backend logs/table setup.", false);
   }
 }
 
@@ -268,6 +362,18 @@ passwordInput.addEventListener("keydown", (event) => {
 });
 
 logoutBtn.addEventListener("click", logout);
+
+if (navEl) {
+  navEl.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLButtonElement)) return;
+    const panelId = target.dataset.target;
+    if (!panelId) return;
+    setActivePanel(panelId);
+  });
+}
+
+refreshUpcomingBtn.addEventListener("click", loadUpcomingBookings);
 
 addSuiteBtn.addEventListener("click", () => {
   const row = createTableRow([
@@ -297,6 +403,7 @@ async function init() {
   clearAdminToken();
   setLoginCardVisible(true);
   setWorkspaceVisible(false);
+  setActivePanel("panel-upcoming");
   showStatus("Please sign in with administrator account.", false);
 }
 
