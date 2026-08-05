@@ -12,11 +12,17 @@ export async function onRequest({ request, env }) {
     return new Response(null, { headers: CORS });
   }
 
-  const { SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_API_KEY } = env;
+  const { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ADMIN_API_KEY } = env;
   const base = `${SUPABASE_URL}/rest/v1/bookings`;
   const auth = {
     "apikey": SUPABASE_ANON_KEY,
     "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+  };
+  const adminRestKey = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+  const adminAuth = {
+    "apikey": adminRestKey,
+    "Authorization": `Bearer ${adminRestKey}`,
     "Content-Type": "application/json",
   };
 
@@ -54,7 +60,7 @@ export async function onRequest({ request, env }) {
 
     const res = await fetch(`${base}?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE",
-      headers: auth,
+      headers: adminAuth,
     });
     return new Response(null, { status: res.ok ? 200 : 500, headers: CORS });
   }
