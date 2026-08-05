@@ -843,7 +843,8 @@ th {
     display: none;
   }
 
-  table {
+  table,
+  .admin-page table {
     min-width: 0;
   }
 

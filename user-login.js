@@ -122,29 +122,41 @@ async function verifySession() {
   return true;
 }
 
+const BOOKING_ROW_LABELS = ["Booking ID", "Cat", "Dates", "Suite", "Add-on", "Total (MYR)", "Notes"];
+
 function renderBookings(rows) {
   bookingsList.innerHTML = "";
 
   if (!rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="7">No bookings found for your account email yet.</td>';
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.textContent = "No bookings found for your account email yet.";
+    tr.appendChild(td);
     bookingsList.appendChild(tr);
     return;
   }
 
   rows.forEach((row) => {
-    const tr = document.createElement("tr");
     const catLabel = `${row.cat_name} (${row.breed || "-"}, ${row.age ?? "-"}y)`;
     const dateLabel = `${row.check_in} to ${row.check_out}`;
-    tr.innerHTML = `
-      <td>${row.id}</td>
-      <td>${catLabel}</td>
-      <td>${dateLabel}</td>
-      <td>${row.suite_type || "-"}</td>
-      <td>${row.add_on || "-"}</td>
-      <td>${formatMoney(row.total_price)}</td>
-      <td>${row.notes || "-"}</td>
-    `;
+    const values = [
+      row.id,
+      catLabel,
+      dateLabel,
+      row.suite_type || "-",
+      row.add_on || "-",
+      formatMoney(row.total_price),
+      row.notes || "-",
+    ];
+
+    const tr = document.createElement("tr");
+    values.forEach((value, index) => {
+      const td = document.createElement("td");
+      td.dataset.label = BOOKING_ROW_LABELS[index];
+      td.textContent = value;
+      tr.appendChild(td);
+    });
     bookingsList.appendChild(tr);
   });
 }

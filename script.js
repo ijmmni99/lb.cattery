@@ -526,7 +526,10 @@ bookingForm.addEventListener("submit", async (event) => {
   showStep(0);
   await renderBlockedRanges(availabilitySuite.value);
   await renderAvailabilityCalendar();
-  showAvailabilityMessage("Reservation confirmed and dates are now blocked.", true);
+  showAvailabilityMessage(
+    `Reservation confirmed. Booking ID: ${booking.id} — a confirmation was emailed to ${booking.ownerEmail}. Keep the ID to look up this booking later.`,
+    true,
+  );
 });
 
 checkAvailabilityBtn.addEventListener("click", async () => {

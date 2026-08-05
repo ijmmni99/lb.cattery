@@ -7,6 +7,70 @@ const CORS = {
   "Content-Type": "application/json",
 };
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[char]);
+}
+
+async function lookupNames(env, auth) {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/system_config?key=eq.global&select=value&limit=1`, { headers: auth });
+  if (!res.ok) return { suites: [], addons: [] };
+  const rows = await res.json().catch(() => []);
+  const value = Array.isArray(rows) && rows[0]?.value ? rows[0].value : {};
+  return {
+    suites: Array.isArray(value.suites) ? value.suites : [],
+    addons: Array.isArray(value.addons) ? value.addons : [],
+  };
+}
+
+async function sendBookingConfirmationEmail(env, auth, booking) {
+  if (!env.RESEND_API_KEY) return;
+
+  const { suites, addons } = await lookupNames(env, auth);
+  const suite = suites.find((s) => s.code === booking.suite_type);
+  const addon = addons.find((a) => a.code === booking.add_on);
+  const formattedTotal = new Intl.NumberFormat("ms-MY", {
+    style: "currency",
+    currency: "MYR",
+    maximumFractionDigits: 2,
+  }).format(Number(booking.total_price) || 0);
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: env.RESEND_FROM_EMAIL || "L&B Cattery <onboarding@resend.dev>",
+      to: [booking.owner_email],
+      subject: `Booking confirmed - ${booking.id}`,
+      html: `
+        <p>Hi ${escapeHtml(booking.owner_name) || "there"},</p>
+        <p>Your reservation for <strong>${escapeHtml(booking.cat_name) || "your cat"}</strong> is confirmed.</p>
+        <ul>
+          <li>Booking ID: <strong>${escapeHtml(booking.id)}</strong></li>
+          <li>Suite: ${escapeHtml(suite ? suite.name : booking.suite_type)}</li>
+          <li>Add-on: ${escapeHtml(addon ? addon.name : booking.add_on || "None")}</li>
+          <li>Stay: ${escapeHtml(booking.check_in)} to ${escapeHtml(booking.check_out)}</li>
+          <li>Total: ${formattedTotal}</li>
+        </ul>
+        <p>Keep your booking ID handy. You can look up this booking anytime using your email and booking ID, or create an account with this same email address to view all your bookings in one place.</p>
+      `,
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error("sendBookingConfirmationEmail failed", res.status, detail);
+  }
+}
+
 export async function onRequest({ request, env }) {
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: CORS });
@@ -42,6 +106,13 @@ export async function onRequest({ request, env }) {
       headers: { ...auth, "Prefer": "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify(body),
     });
+
+    if (res.ok && body.owner_email) {
+      await sendBookingConfirmationEmail(env, adminAuth, body).catch((err) =>
+        console.error("sendBookingConfirmationEmail failed", err),
+      );
+    }
+
     return new Response(null, { status: res.ok ? 200 : 500, headers: CORS });
   }
 

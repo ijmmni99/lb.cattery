@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>L&B Cattery | Booking Lookup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="admin-page">
+    <header class="site-header">
+      <div class="brand-wrap">
+        <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
+        <div>
+          <p class="eyebrow">Booking Lookup</p>
+          <h1>Find Your Reservation</h1>
+          <p class="brand-tagline">No account needed.</p>
+        </div>
+      </div>
+      <p class="intro nav-link-row"><a href="index.html">Back to booking page</a></p>
+    </header>
+
+    <main class="layout admin-layout">
+      <section class="card wide admin-auth-card">
+        <h2>Look Up a Booking</h2>
+        <p class="form-mode">Enter the booking ID and email you used when reserving to view your details.</p>
+
+        <form id="lookup-form" class="auth-form">
+          <div class="auth-grid">
+            <label>
+              Booking ID
+              <input id="lookup-booking-id" type="text" placeholder="LB-123456" required />
+            </label>
+            <label>
+              Email
+              <input id="lookup-email" type="email" autocomplete="email" required />
+            </label>
+          </div>
+          <div class="actions-row auth-actions">
+            <button type="submit">Find Booking</button>
+          </div>
+        </form>
+
+        <p id="lookup-status" class="status" aria-live="polite"></p>
+
+        <div id="lookup-result" class="card" hidden>
+          <h3>Booking Details</h3>
+          <dl id="lookup-summary" class="booking-summary"></dl>
+        </div>
+      </section>
+    </main>
+
+    <script src="booking-lookup.js"></script>
+  </body>
+</html>
