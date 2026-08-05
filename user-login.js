@@ -4,10 +4,15 @@ const authStatus = document.getElementById("user-auth-status");
 const bookingsStatus = document.getElementById("user-bookings-status");
 const userWelcome = document.getElementById("user-welcome");
 
+const authSwitch = document.querySelector(".auth-switch");
 const loginForm = document.getElementById("login-form");
 const signupForm = document.getElementById("signup-form");
+const forgotForm = document.getElementById("forgot-form");
+const resetForm = document.getElementById("reset-form");
 const showLoginBtn = document.getElementById("show-login");
 const showSignupBtn = document.getElementById("show-signup");
+const showForgotLink = document.getElementById("show-forgot");
+const showLoginFromForgotLink = document.getElementById("show-login-from-forgot");
 
 const loginEmail = document.getElementById("login-email");
 const loginPassword = document.getElementById("login-password");
@@ -16,6 +21,10 @@ const signupName = document.getElementById("signup-name");
 const signupPhone = document.getElementById("signup-phone");
 const signupEmail = document.getElementById("signup-email");
 const signupPassword = document.getElementById("signup-password");
+
+const forgotEmail = document.getElementById("forgot-email");
+const resetPassword = document.getElementById("reset-password");
+let activeResetToken = "";
 
 const refreshBtn = document.getElementById("refresh-user-bookings");
 const logoutBtn = document.getElementById("user-logout");
@@ -55,13 +64,20 @@ function extractApiErrorMessage(data, fallback) {
 }
 
 function setMode(mode) {
-  const isLogin = mode === "login";
-  loginForm.hidden = !isLogin;
-  signupForm.hidden = isLogin;
-  showLoginBtn.classList.toggle("active", isLogin);
-  showSignupBtn.classList.toggle("active", !isLogin);
-  showLoginBtn.classList.toggle("secondary", !isLogin);
-  showSignupBtn.classList.toggle("secondary", isLogin);
+  loginForm.hidden = mode !== "login";
+  signupForm.hidden = mode !== "signup";
+  forgotForm.hidden = mode !== "forgot";
+  resetForm.hidden = mode !== "reset";
+
+  const showTabs = mode === "login" || mode === "signup";
+  authSwitch.hidden = !showTabs;
+  if (showTabs) {
+    const isLogin = mode === "login";
+    showLoginBtn.classList.toggle("active", isLogin);
+    showSignupBtn.classList.toggle("active", !isLogin);
+    showLoginBtn.classList.toggle("secondary", !isLogin);
+    showSignupBtn.classList.toggle("secondary", isLogin);
+  }
 }
 
 function getToken() {
@@ -218,8 +234,58 @@ signupForm.addEventListener("submit", async (event) => {
   await loadMyBookings();
 });
 
+forgotForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const res = await fetch("/api/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "request", email: forgotEmail.value }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    setAuthStatus(extractApiErrorMessage(data, "Failed to send reset link."), false);
+    return;
+  }
+
+  forgotForm.reset();
+  setAuthStatus(data.message || "If that email is registered, a reset link has been sent.", true);
+});
+
+resetForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const res = await fetch("/api/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "confirm", token: activeResetToken, password: resetPassword.value }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    setAuthStatus(extractApiErrorMessage(data, "Failed to reset password."), false);
+    return;
+  }
+
+  resetForm.reset();
+  window.history.replaceState({}, "", "user-login.html");
+  setMode("login");
+  setAuthStatus("Password updated. Please sign in with your new password.", true);
+});
+
 showLoginBtn.addEventListener("click", () => setMode("login"));
 showSignupBtn.addEventListener("click", () => setMode("signup"));
+
+showForgotLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  setMode("forgot");
+});
+
+showLoginFromForgotLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  setMode("login");
+});
 
 refreshBtn.addEventListener("click", loadMyBookings);
 
@@ -230,12 +296,18 @@ logoutBtn.addEventListener("click", () => {
 });
 
 async function init() {
+  const resetToken = new URLSearchParams(window.location.search).get("reset");
+  if (resetToken) {
+    activeResetToken = resetToken;
+    setMode("reset");
+    return;
+  }
+
   setMode("login");
   const valid = await verifySession();
   if (!valid) {
     clearSession();
     showLoggedOutUi();
-    setAuthStatus("Sign in or sign up to continue.", false);
     return;
   }
 

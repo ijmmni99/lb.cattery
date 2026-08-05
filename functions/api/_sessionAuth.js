@@ -25,6 +25,19 @@ export async function hashPassword(password, secret) {
   return sha256Base64Url(`${password}.${secret}`);
 }
 
+export async function hashValue(value, secret) {
+  return sha256Base64Url(`${value}.${secret}`);
+}
+
+export function generateRandomToken(byteLength = 24) {
+  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
+  let str = "";
+  for (const byte of bytes) {
+    str += String.fromCharCode(byte);
+  }
+  return toBase64Url(str);
+}
+
 export async function createSessionToken(subject, secret, ttlMs = 12 * 60 * 60 * 1000, extra = {}) {
   const payloadObj = {
     sub: subject,

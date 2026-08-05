@@ -46,6 +46,9 @@
               <input id="login-password" type="password" autocomplete="current-password" required />
             </label>
           </div>
+          <p class="form-mode nav-link-row">
+            <a href="#" id="show-forgot">Forgot password?</a>
+          </p>
           <div class="actions-row auth-actions">
             <button type="submit">Continue</button>
           </div>
@@ -72,6 +75,35 @@
           </div>
           <div class="actions-row auth-actions">
             <button type="submit">Create Account and Continue</button>
+          </div>
+        </form>
+
+        <form id="forgot-form" class="auth-form" hidden>
+          <p class="form-mode">Enter your account email and we'll send you a password reset link.</p>
+          <div class="auth-grid">
+            <label>
+              Email
+              <input id="forgot-email" type="email" autocomplete="email" required />
+            </label>
+          </div>
+          <p class="form-mode nav-link-row">
+            <a href="#" id="show-login-from-forgot">Back to sign in</a>
+          </p>
+          <div class="actions-row auth-actions">
+            <button type="submit">Send Reset Link</button>
+          </div>
+        </form>
+
+        <form id="reset-form" class="auth-form" hidden>
+          <p class="form-mode">Choose a new password for your account.</p>
+          <div class="auth-grid">
+            <label>
+              New password
+              <input id="reset-password" type="password" autocomplete="new-password" minlength="8" required />
+            </label>
+          </div>
+          <div class="actions-row auth-actions">
+            <button type="submit">Set New Password</button>
           </div>
         </form>
 
