@@ -41,6 +41,19 @@ function setBookingsStatus(message, ok) {
   bookingsStatus.classList.add(ok ? "ok" : "warn");
 }
 
+function extractApiErrorMessage(data, fallback) {
+  if (!data || typeof data !== "object") return fallback;
+  const parts = [];
+  if (data.error) parts.push(String(data.error));
+  if (data.hint) parts.push(`Hint: ${String(data.hint)}`);
+  if (data.status) parts.push(`Status: ${String(data.status)}`);
+  if (data.detail) {
+    const detailText = String(data.detail).replace(/\s+/g, " ").trim();
+    if (detailText) parts.push(`Detail: ${detailText.slice(0, 220)}`);
+  }
+  return parts.length ? parts.join(" | ") : fallback;
+}
+
 function setMode(mode) {
   const isLogin = mode === "login";
   loginForm.hidden = !isLogin;
@@ -160,7 +173,7 @@ loginForm.addEventListener("submit", async (event) => {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.token) {
-    setAuthStatus(data.error || "Login failed.", false);
+    setAuthStatus(extractApiErrorMessage(data, "Login failed."), false);
     return;
   }
 
@@ -191,7 +204,7 @@ signupForm.addEventListener("submit", async (event) => {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.token) {
-    setAuthStatus(data.error || "Sign up failed.", false);
+    setAuthStatus(extractApiErrorMessage(data, "Sign up failed."), false);
     return;
   }
 
