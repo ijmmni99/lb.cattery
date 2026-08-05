@@ -10,7 +10,6 @@ const DEFAULT_SETTINGS = {
     { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, active: true },
   ],
   addons: [
-    { code: "none", name: "No add-on", flatFee: 0, nightlyFee: 0, active: true },
     { code: "grooming", name: "Grooming Package", flatFee: 18, nightlyFee: 0, active: true },
     { code: "playtime", name: "Extended Playtime", flatFee: 0, nightlyFee: 10, active: true },
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
@@ -231,13 +230,32 @@ async function fetchBookings() {
   return await res.json();
 }
 
+function catsLabel(row) {
+  const cats = Array.isArray(row.cats) && row.cats.length
+    ? row.cats
+    : row.cat_name
+      ? [{ name: row.cat_name, breed: row.breed, age: row.age }]
+      : [];
+  if (!cats.length) return "-";
+  return cats.map((cat) => `${cat.name || "-"} (${cat.breed || "-"}, ${cat.age ?? "-"}y)`).join("; ");
+}
+
+function addOnsLabel(row) {
+  const addOns = Array.isArray(row.add_ons) && row.add_ons.length
+    ? row.add_ons
+    : row.add_on
+      ? [row.add_on]
+      : [];
+  return addOns.length ? addOns.join(", ") : "-";
+}
+
 function renderUpcomingBookings(rows) {
   upcomingRowsEl.innerHTML = "";
 
   if (!rows.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 7;
+    td.colSpan = 8;
     td.textContent = "No upcoming bookings found.";
     tr.appendChild(td);
     upcomingRowsEl.appendChild(tr);
@@ -246,20 +264,20 @@ function renderUpcomingBookings(rows) {
 
   rows.forEach((row) => {
     const ownerLabel = `${row.owner_name || "-"} (${row.owner_phone || "-"})`;
-    const catLabel = `${row.cat_name || "-"} (${row.breed || "-"}, ${row.age ?? "-"}y)`;
     const dateLabel = `${row.check_in || "-"} to ${row.check_out || "-"}`;
 
     const tr = createTableRow(
       [
         document.createTextNode(row.id || "-"),
         document.createTextNode(ownerLabel),
-        document.createTextNode(catLabel),
+        document.createTextNode(catsLabel(row)),
         document.createTextNode(dateLabel),
         document.createTextNode(row.suite_type || "-"),
+        document.createTextNode(addOnsLabel(row)),
         document.createTextNode(formatMoney(row.total_price)),
         document.createTextNode(row.notes || "-"),
       ],
-      ["Booking ID", "Owner", "Cat", "Stay Dates", "Suite", "Total (MYR)", "Notes"],
+      ["Booking ID", "Owner", "Cats", "Stay Dates", "Suite", "Add-ons", "Total (MYR)", "Notes"],
     );
 
     upcomingRowsEl.appendChild(tr);

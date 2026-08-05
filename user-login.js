@@ -122,7 +122,26 @@ async function verifySession() {
   return true;
 }
 
-const BOOKING_ROW_LABELS = ["Booking ID", "Cat", "Dates", "Suite", "Add-on", "Total (MYR)", "Notes"];
+const BOOKING_ROW_LABELS = ["Booking ID", "Cats", "Dates", "Suite", "Add-ons", "Total (MYR)", "Notes"];
+
+function catsLabel(row) {
+  const cats = Array.isArray(row.cats) && row.cats.length
+    ? row.cats
+    : row.cat_name
+      ? [{ name: row.cat_name, breed: row.breed, age: row.age }]
+      : [];
+  if (!cats.length) return "-";
+  return cats.map((cat) => `${cat.name || "-"} (${cat.breed || "-"}, ${cat.age ?? "-"}y)`).join("; ");
+}
+
+function addOnsLabel(row) {
+  const addOns = Array.isArray(row.add_ons) && row.add_ons.length
+    ? row.add_ons
+    : row.add_on
+      ? [row.add_on]
+      : [];
+  return addOns.length ? addOns.join(", ") : "-";
+}
 
 function renderBookings(rows) {
   bookingsList.innerHTML = "";
@@ -138,14 +157,13 @@ function renderBookings(rows) {
   }
 
   rows.forEach((row) => {
-    const catLabel = `${row.cat_name} (${row.breed || "-"}, ${row.age ?? "-"}y)`;
     const dateLabel = `${row.check_in} to ${row.check_out}`;
     const values = [
       row.id,
-      catLabel,
+      catsLabel(row),
       dateLabel,
       row.suite_type || "-",
-      row.add_on || "-",
+      addOnsLabel(row),
       formatMoney(row.total_price),
       row.notes || "-",
     ];

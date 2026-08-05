@@ -62,6 +62,55 @@ create table if not exists public.app_users (
 );
 ```
 
+### Bookings table: multiple cats and add-ons per booking
+
+Bookings now store one **or more** cats and **zero or more** add-ons per
+submission, instead of a single cat and a single add-on. This is modeled as
+two `jsonb` columns:
+
+- `cats jsonb` — array of `{ "name": "...", "breed": "...", "age": "..." }`
+- `add_ons jsonb` — array of add-on codes, e.g. `["grooming", "playtime"]`
+
+If your `bookings` table still has the old scalar columns (`cat_name`,
+`breed`, `age`, `add_on`), run this migration in the Supabase SQL editor.
+It adds the new columns and backfills them from the old ones so existing
+rows keep displaying correctly; the old columns are left in place (unused
+by the app going forward) so this is safe to run without downtime:
+
+```sql
+alter table public.bookings
+	add column if not exists cats jsonb not null default '[]'::jsonb,
+	add column if not exists add_ons jsonb not null default '[]'::jsonb;
+
+update public.bookings
+set cats = jsonb_build_array(jsonb_build_object('name', cat_name, 'breed', breed, 'age', age))
+where cats = '[]'::jsonb and cat_name is not null and cat_name <> '';
+
+update public.bookings
+set add_ons = jsonb_build_array(add_on)
+where add_ons = '[]'::jsonb and add_on is not null and add_on <> '' and add_on <> 'none';
+```
+
+If you are creating the `bookings` table from scratch, include `cats` and
+`add_ons` from the start:
+
+```sql
+create table if not exists public.bookings (
+	id text primary key,
+	owner_name text not null,
+	owner_email text not null,
+	owner_phone text,
+	cats jsonb not null default '[]'::jsonb,
+	suite_type text not null,
+	check_in date not null,
+	check_out date not null,
+	add_ons jsonb not null default '[]'::jsonb,
+	total_price numeric not null default 0,
+	notes text,
+	created_at timestamptz default now()
+);
+```
+
 ## API Overview
 
 - `GET /api/settings`: public read of current settings

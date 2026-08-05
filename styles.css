@@ -314,6 +314,72 @@ button.secondary {
   flex-wrap: wrap;
 }
 
+.addon-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: var(--brand-ink);
+}
+
+.addon-field-label {
+  font-weight: 600;
+}
+
+.addon-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 1px solid var(--brand-border);
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+  background: #fffdfb;
+}
+
+.addon-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.addon-option input[type="checkbox"] {
+  transform: scale(1.1);
+}
+
+.cat-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.cat-card {
+  border: 1px solid var(--brand-border);
+  border-radius: 14px;
+  padding: 0.85rem;
+  background: #fffdfb;
+}
+
+.cat-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.remove-cat-btn {
+  min-height: 34px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.add-cat-btn {
+  width: 100%;
+  margin-bottom: 0.85rem;
+}
+
 .availability-action {
   width: 100%;
   margin-top: 0.85rem;
