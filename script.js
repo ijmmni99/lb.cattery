@@ -33,6 +33,8 @@ const formModeEl = document.getElementById("form-mode");
 const suiteSelect = bookingForm.elements.namedItem("suiteType");
 const addOnSelect = bookingForm.elements.namedItem("addOn");
 const priceGuideEl = document.getElementById("price-guide");
+const accountMenuBtn = document.getElementById("account-menu-btn");
+const accountMenu = document.getElementById("account-menu");
 
 const calendarState = {
   year: new Date().getFullYear(),
@@ -40,6 +42,26 @@ const calendarState = {
 };
 
 let settings = structuredClone(DEFAULT_SETTINGS);
+
+function toggleAccountMenu(forceOpen = null) {
+  if (!accountMenu || !accountMenuBtn) return;
+  const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : accountMenu.hidden;
+  accountMenu.hidden = !shouldOpen;
+  accountMenuBtn.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+}
+
+if (accountMenuBtn && accountMenu) {
+  accountMenuBtn.addEventListener("click", () => {
+    toggleAccountMenu();
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (accountMenu.contains(target) || accountMenuBtn.contains(target)) return;
+    toggleAccountMenu(false);
+  });
+}
 
 function parseDate(dateString) {
   return new Date(`${dateString}T00:00:00`);

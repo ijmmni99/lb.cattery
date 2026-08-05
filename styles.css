@@ -26,9 +26,76 @@ body {
 }
 
 .site-header {
+  position: relative;
   max-width: 1120px;
   margin: 0 auto;
   padding: 2.5rem 1.25rem 1.5rem;
+}
+
+.header-auth {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.25rem;
+}
+
+.account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 40px;
+  padding: 0.5rem 0.85rem;
+}
+
+.account-icon {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--brand-primary-dark);
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+}
+
+.account-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  transform: translateX(-50%);
+  width: 13px;
+  height: 7px;
+  border: 2px solid var(--brand-primary-dark);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+
+.account-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  min-width: 190px;
+  background: #fffdf8;
+  border: 1px solid var(--brand-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  padding: 0.35rem;
+  z-index: 20;
+}
+
+.account-menu a {
+  text-decoration: none;
+  color: var(--brand-ink);
+  font-weight: 600;
+  padding: 0.55rem 0.65rem;
+  border-radius: 9px;
+}
+
+.account-menu a:hover {
+  background: #fff0cb;
+}
+
+.account-menu[hidden] {
+  display: none;
 }
 
 .brand-wrap {
@@ -383,6 +450,142 @@ th {
   border-color: #f2b9a7;
 }
 
+.admin-page .site-header,
+.admin-page .layout {
+  max-width: 1280px;
+}
+
+.admin-page .admin-layout {
+  grid-template-columns: 1fr;
+}
+
+.admin-auth-card {
+  max-width: 720px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #fffaf1 0%, #fff4dd 100%);
+}
+
+.admin-page .auth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.admin-page .auth-actions {
+  margin-top: 0.8rem;
+  align-items: center;
+}
+
+.admin-page .admin-workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.admin-page .admin-workspace[hidden],
+.admin-page #admin-login-card[hidden] {
+  display: none !important;
+}
+
+.admin-page .admin-workspace .wide {
+  grid-column: auto;
+}
+
+.admin-toolbar-card {
+  background: linear-gradient(180deg, #fff8eb 0%, #fff2d9 100%);
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-page .card h2 {
+  margin-top: 0;
+  margin-bottom: 0.8rem;
+}
+
+.admin-page .table-wrap {
+  border: 1px solid #f0d7a0;
+  border-radius: 12px;
+  overflow: auto;
+  background: #fffdf9;
+}
+
+.admin-page table {
+  min-width: 640px;
+}
+
+.admin-page th,
+.admin-page td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.admin-page td input[type="text"],
+.admin-page td input[type="number"] {
+  min-width: 110px;
+  padding: 0.5rem 0.55rem;
+}
+
+.admin-page td input[type="checkbox"] {
+  display: block;
+  margin: 0 auto;
+}
+
+.admin-page .status {
+  margin-top: 0.8rem;
+}
+
+.auth-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-bottom: 0.8rem;
+}
+
+.auth-tab {
+  min-height: 38px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.92rem;
+}
+
+.auth-tab.active {
+  background: var(--brand-primary);
+  color: #fff;
+  border: 0;
+}
+
+.auth-form[hidden] {
+  display: none;
+}
+
+.user-page .admin-auth-card {
+  max-width: 860px;
+  background: linear-gradient(180deg, #fffaf1 0%, #fff4df 100%);
+}
+
+.user-page .admin-workspace {
+  margin-top: 0.35rem;
+}
+
+.user-page .auth-actions button {
+  min-width: 240px;
+}
+
+@media (max-width: 640px) {
+  .auth-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .user-page .auth-actions button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 @keyframes reveal {
   from {
     opacity: 0;
@@ -421,11 +624,41 @@ th {
   .actions-row button {
     width: 100%;
   }
+
+  .admin-page .auth-grid,
+  .admin-page .admin-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-page .actions-row {
+    display: flex;
+    width: auto;
+  }
+
+  .admin-page .actions-row button {
+    width: auto;
+  }
 }
 
 @media (max-width: 640px) {
   .site-header {
     padding: 1.15rem 0.85rem 1rem;
+  }
+
+  .header-auth {
+    position: static;
+    margin-bottom: 0.7rem;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .account-menu {
+    right: 0;
   }
 
   .layout {

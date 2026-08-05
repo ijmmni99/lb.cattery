@@ -14,6 +14,17 @@
   </head>
   <body>
     <header class="site-header">
+      <div class="header-auth">
+        <button id="account-menu-btn" class="account-btn secondary" type="button" aria-haspopup="true" aria-expanded="false">
+          <span class="account-icon" aria-hidden="true"></span>
+          Account
+        </button>
+        <div id="account-menu" class="account-menu" hidden>
+          <a href="user-login.html">Login as User</a>
+          <a href="admin.html">Login as Staff</a>
+        </div>
+      </div>
+
       <div class="brand-wrap">
         <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
         <div>
@@ -24,9 +35,6 @@
       </div>
       <p class="intro">
         Plan your cat's stay with transparent rates, suite-based availability checks, and quick reservation tracking.
-      </p>
-      <p class="intro nav-link-row">
-        Staff access: <a href="admin.html">Open administrator backend</a>
       </p>
     </header>
 

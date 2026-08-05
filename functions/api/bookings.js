@@ -1,6 +1,8 @@
+import { getAdminSecret, getAdminTokenFromRequest, verifyAdminToken } from "./_adminAuth.js";
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-key",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-token, x-admin-key, authorization",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Content-Type": "application/json",
 };
@@ -38,9 +40,15 @@ export async function onRequest({ request, env }) {
   }
 
   if (request.method === "DELETE" && id) {
+    const adminSecret = getAdminSecret(env);
+    const token = getAdminTokenFromRequest(request);
+    const isTokenValid = await verifyAdminToken(token, adminSecret);
+
     const expectedAdminKey = ADMIN_API_KEY || SUPABASE_ANON_KEY;
     const providedKey = request.headers.get("x-admin-key") || "";
-    if (!expectedAdminKey || providedKey !== expectedAdminKey) {
+    const isLegacyKeyValid = Boolean(expectedAdminKey && providedKey === expectedAdminKey);
+
+    if (!isTokenValid && !isLegacyKeyValid) {
       return new Response(null, { status: 401, headers: CORS });
     }
 

@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="admin-page">
     <header class="site-header">
       <div class="brand-wrap">
         <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
@@ -28,88 +28,107 @@
     </header>
 
     <main class="layout admin-layout">
-      <section class="card wide">
-        <h2>Admin Access</h2>
-        <p class="form-mode">Enter the backend admin key. It is required only for save actions.</p>
-        <div class="grid two">
+      <section id="admin-login-card" class="card wide admin-auth-card">
+        <h2>Admin Login</h2>
+        <p class="form-mode">Sign in with your administrator account to manage pricing, booking rules, suites, and add-ons.</p>
+        <div class="auth-grid">
           <label>
-            Admin API key
-            <input id="admin-key" type="password" autocomplete="off" />
+            Username
+            <input id="admin-username" type="text" autocomplete="username" />
+          </label>
+          <label>
+            Password
+            <input id="admin-password" type="password" autocomplete="current-password" />
           </label>
         </div>
-        <div class="actions-row">
-          <button id="save-admin-key" type="button">Save Key</button>
-          <button id="load-settings" type="button" class="secondary">Reload Settings</button>
+        <div class="actions-row auth-actions">
+          <button id="admin-login" type="button">Sign In</button>
         </div>
         <p id="admin-status" class="status" aria-live="polite"></p>
       </section>
 
-      <section class="card">
-        <h2>Booking Configuration</h2>
-        <div class="grid two">
-          <label>
-            Allow public booking
-            <select id="allow-public-booking">
-              <option value="true">Enabled</option>
-              <option value="false">Disabled</option>
-            </select>
-          </label>
-          <label>
-            Minimum nights
-            <input id="min-nights" type="number" min="1" step="1" />
-          </label>
-          <label>
-            Maximum nights
-            <input id="max-nights" type="number" min="1" step="1" />
-          </label>
-        </div>
-      </section>
+      <div id="admin-workspace" class="admin-workspace" hidden>
+        <section class="card wide admin-toolbar-card">
+          <div class="admin-toolbar">
+            <div>
+              <h2>Administrator Workspace</h2>
+              <p class="form-mode">You are signed in. Manage all backend configuration below.</p>
+            </div>
+            <button id="admin-logout" type="button" class="secondary">Sign Out</button>
+          </div>
+        </section>
 
-      <section class="card">
-        <h2>Suites Configuration</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Nightly Price (MYR)</th>
-                <th>Capacity</th>
-                <th>Active</th>
-              </tr>
-            </thead>
-            <tbody id="suite-rows"></tbody>
-          </table>
-        </div>
-        <button id="add-suite" type="button" class="secondary">Add Suite</button>
-      </section>
+        <section class="card">
+          <h2>Booking Configuration</h2>
+          <div class="grid two">
+            <label>
+              Allow public booking
+              <select id="allow-public-booking">
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+              </select>
+            </label>
+            <label>
+              Minimum nights
+              <input id="min-nights" type="number" min="1" step="1" />
+            </label>
+            <label>
+              Maximum nights
+              <input id="max-nights" type="number" min="1" step="1" />
+            </label>
+          </div>
+        </section>
 
-      <section class="card">
-        <h2>Add-on Items Configuration</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Flat Fee (MYR)</th>
-                <th>Nightly Fee (MYR)</th>
-                <th>Active</th>
-              </tr>
-            </thead>
-            <tbody id="addon-rows"></tbody>
-          </table>
-        </div>
-        <button id="add-addon" type="button" class="secondary">Add Add-on</button>
-      </section>
+        <section class="card">
+          <h2>Suites Configuration</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Nightly Price (MYR)</th>
+                  <th>Capacity</th>
+                  <th>Active</th>
+                </tr>
+              </thead>
+              <tbody id="suite-rows"></tbody>
+            </table>
+          </div>
+          <div class="actions-row">
+            <button id="add-suite" type="button" class="secondary">Add Suite</button>
+          </div>
+        </section>
 
-      <section class="card wide">
-        <h2>Save Backend Configuration</h2>
-        <p class="form-mode">This updates the settings consumed by the public booking page.</p>
-        <div class="actions-row">
-          <button id="save-settings" type="button">Save All Settings</button>
-        </div>
-      </section>
+        <section class="card wide">
+          <h2>Add-on Items Configuration</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Flat Fee (MYR)</th>
+                  <th>Nightly Fee (MYR)</th>
+                  <th>Active</th>
+                </tr>
+              </thead>
+              <tbody id="addon-rows"></tbody>
+            </table>
+          </div>
+          <div class="actions-row">
+            <button id="add-addon" type="button" class="secondary">Add Add-on</button>
+          </div>
+        </section>
+
+        <section class="card wide">
+          <h2>Save Backend Configuration</h2>
+          <p class="form-mode">This updates the settings consumed by the public booking page.</p>
+          <div class="actions-row">
+            <button id="save-settings" type="button">Save All Settings</button>
+          </div>
+        </section>
+      </div>
     </main>
 
     <script src="admin.js"></script>

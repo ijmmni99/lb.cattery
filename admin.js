@@ -17,10 +17,13 @@ const DEFAULT_SETTINGS = {
   ],
 };
 
-const keyInput = document.getElementById("admin-key");
-const saveKeyBtn = document.getElementById("save-admin-key");
-const reloadBtn = document.getElementById("load-settings");
+const usernameInput = document.getElementById("admin-username");
+const passwordInput = document.getElementById("admin-password");
+const loginBtn = document.getElementById("admin-login");
+const logoutBtn = document.getElementById("admin-logout");
+const loginCardEl = document.getElementById("admin-login-card");
 const statusEl = document.getElementById("admin-status");
+const workspaceEl = document.getElementById("admin-workspace");
 
 const allowPublicBookingEl = document.getElementById("allow-public-booking");
 const minNightsEl = document.getElementById("min-nights");
@@ -33,18 +36,38 @@ const addSuiteBtn = document.getElementById("add-suite");
 const addAddonBtn = document.getElementById("add-addon");
 const saveSettingsBtn = document.getElementById("save-settings");
 
-function getAdminKey() {
-  return localStorage.getItem("lb_admin_key") || "";
+function getAdminToken() {
+  return localStorage.getItem("lb_admin_token") || "";
 }
 
-function setAdminKey(value) {
-  localStorage.setItem("lb_admin_key", value);
+function setAdminToken(value) {
+  localStorage.setItem("lb_admin_token", value);
+}
+
+function clearAdminToken() {
+  localStorage.removeItem("lb_admin_token");
 }
 
 function showStatus(message, ok) {
   statusEl.textContent = message;
   statusEl.classList.remove("ok", "warn");
   statusEl.classList.add(ok ? "ok" : "warn");
+}
+
+function setWorkspaceVisible(visible) {
+  workspaceEl.hidden = !visible;
+  saveSettingsBtn.disabled = !visible;
+  addSuiteBtn.disabled = !visible;
+  addAddonBtn.disabled = !visible;
+}
+
+function setLoginCardVisible(visible) {
+  loginCardEl.hidden = !visible;
+}
+
+function getAuthHeaders() {
+  const token = getAdminToken();
+  return token ? { "x-admin-token": token } : {};
 }
 
 function createCellInput(value, type = "text", step = "0.01") {
@@ -139,6 +162,45 @@ async function fetchSettings() {
   return await res.json();
 }
 
+async function login() {
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value;
+
+  if (!username || !password) {
+    showStatus("Please enter both username and password.", false);
+    return;
+  }
+
+  const res = await fetch("/api/admin-login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!res.ok) {
+    showStatus("Invalid admin credentials.", false);
+    setWorkspaceVisible(false);
+    return;
+  }
+
+  const data = await res.json();
+  setAdminToken(data.token);
+  passwordInput.value = "";
+  setLoginCardVisible(false);
+  setWorkspaceVisible(true);
+  showStatus("Signed in as administrator.", true);
+  const settings = await fetchSettings();
+  applySettingsToForm(settings);
+}
+
+function logout() {
+  clearAdminToken();
+  setLoginCardVisible(true);
+  setWorkspaceVisible(false);
+  passwordInput.value = "";
+  showStatus("You are signed out.", false);
+}
+
 function applySettingsToForm(settings) {
   allowPublicBookingEl.value = settings.booking?.allowPublicBooking === false ? "false" : "true";
   minNightsEl.value = String(settings.booking?.minNights || 1);
@@ -160,9 +222,9 @@ function collectSettingsFromForm() {
 }
 
 async function saveSettings() {
-  const adminKey = getAdminKey();
-  if (!adminKey) {
-    showStatus("Enter and save the admin key first.", false);
+  const adminToken = getAdminToken();
+  if (!adminToken) {
+    showStatus("Please sign in before saving settings.", false);
     return;
   }
 
@@ -181,7 +243,7 @@ async function saveSettings() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-admin-key": adminKey,
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(settings),
   });
@@ -189,28 +251,23 @@ async function saveSettings() {
   if (res.ok) {
     showStatus("Settings saved successfully.", true);
   } else if (res.status === 401) {
-    showStatus("Admin key is invalid.", false);
+    logout();
+    showStatus("Session expired. Please sign in again.", false);
   } else {
     showStatus("Failed to save settings. Check backend logs/table setup.", false);
   }
 }
 
-saveKeyBtn.addEventListener("click", () => {
-  const key = keyInput.value.trim();
-  if (!key) {
-    showStatus("Please enter a key before saving.", false);
-    return;
+loginBtn.addEventListener("click", login);
+
+passwordInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    login();
   }
-  setAdminKey(key);
-  keyInput.value = "";
-  showStatus("Admin key saved in this browser.", true);
 });
 
-reloadBtn.addEventListener("click", async () => {
-  const settings = await fetchSettings();
-  applySettingsToForm(settings);
-  showStatus("Settings reloaded from backend.", true);
-});
+logoutBtn.addEventListener("click", logout);
 
 addSuiteBtn.addEventListener("click", () => {
   const row = createTableRow([
@@ -237,15 +294,10 @@ addAddonBtn.addEventListener("click", () => {
 saveSettingsBtn.addEventListener("click", saveSettings);
 
 async function init() {
-  const currentKey = getAdminKey();
-  if (currentKey) {
-    showStatus("Admin key loaded from browser storage.", true);
-  } else {
-    showStatus("Set your admin key to enable save actions.", false);
-  }
-
-  const settings = await fetchSettings();
-  applySettingsToForm(settings);
+  clearAdminToken();
+  setLoginCardVisible(true);
+  setWorkspaceVisible(false);
+  showStatus("Please sign in with administrator account.", false);
 }
 
 init();
