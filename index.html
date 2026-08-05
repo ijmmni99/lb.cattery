@@ -25,12 +25,15 @@
       <p class="intro">
         Plan your cat's stay with transparent rates, suite-based availability checks, and quick reservation tracking.
       </p>
+      <p class="intro nav-link-row">
+        Staff access: <a href="admin.html">Open administrator backend</a>
+      </p>
     </header>
 
     <main class="layout">
       <section class="card" id="booking-card">
         <h2>Create Reservation</h2>
-        <p id="form-mode" class="form-mode">You are creating a new booking.</p>
+        <p id="form-mode" class="form-mode">Bookings are open.</p>
         <form id="booking-form">
           <div class="grid two">
             <label>
@@ -67,20 +70,11 @@
             </label>
             <label>
               Suite type
-              <select name="suiteType" required>
-                <option value="standard">Standard Suite</option>
-                <option value="deluxe">Deluxe Suite</option>
-                <option value="royal">Royal Suite</option>
-              </select>
+              <select name="suiteType" required></select>
             </label>
             <label>
               Add-ons
-              <select name="addOn">
-                <option value="none">No add-on</option>
-                <option value="grooming">Grooming Package</option>
-                <option value="playtime">Extended Playtime</option>
-                <option value="medication">Medication Support</option>
-              </select>
+              <select name="addOn"></select>
             </label>
           </div>
 
@@ -96,7 +90,6 @@
             </div>
             <div class="actions-row">
               <button type="submit" id="submit-booking">Confirm Reservation</button>
-              <button type="button" id="cancel-edit" class="secondary" hidden>Cancel Edit</button>
             </div>
           </div>
         </form>
@@ -107,11 +100,7 @@
         <div class="grid two">
           <label>
             Suite type
-            <select id="availability-suite">
-              <option value="standard">Standard Suite</option>
-              <option value="deluxe">Deluxe Suite</option>
-              <option value="royal">Royal Suite</option>
-            </select>
+            <select id="availability-suite"></select>
           </label>
           <label>
             Desired check-in
@@ -127,14 +116,7 @@
         <div id="blocked-ranges" class="blocked-ranges"></div>
 
         <h3>Price Guide</h3>
-        <ul class="price-guide">
-          <li>Standard Suite: RM20 per night</li>
-          <li>Deluxe Suite: RM35 per night</li>
-          <li>Royal Suite: RM55 per night</li>
-          <li>Grooming Package: +RM18 booking fee</li>
-          <li>Extended Playtime: +RM10 per night</li>
-          <li>Medication Support: +RM12 booking fee</li>
-        </ul>
+        <ul id="price-guide" class="price-guide"></ul>
 
         <h3>Monthly Availability</h3>
         <div class="calendar-toolbar">
@@ -144,41 +126,7 @@
         </div>
         <div id="availability-calendar" class="availability-calendar" aria-live="polite"></div>
       </section>
-
-      <section class="card wide" id="reservations-card">
-        <h2>Upcoming Reservations</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Booking ID</th>
-                <th>Owner</th>
-                <th>Cat</th>
-                <th>Dates</th>
-                <th>Suite</th>
-                <th>Total</th>
-                <th>Notes</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="reservation-list"></tbody>
-          </table>
-        </div>
-      </section>
     </main>
-
-    <template id="reservation-row-template">
-      <tr>
-        <td data-key="id"></td>
-        <td data-key="owner"></td>
-        <td data-key="cat"></td>
-        <td data-key="dates"></td>
-        <td data-key="suite"></td>
-        <td data-key="total"></td>
-        <td data-key="notes"></td>
-        <td data-key="actions"></td>
-      </tr>
-    </template>
 
     <script src="script.js"></script>
   </body>

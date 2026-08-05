@@ -1,5 +1,7 @@
 const CORS = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-key",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Content-Type": "application/json",
 };
 
@@ -8,7 +10,7 @@ export async function onRequest({ request, env }) {
     return new Response(null, { headers: CORS });
   }
 
-  const { SUPABASE_URL, SUPABASE_ANON_KEY } = env;
+  const { SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_API_KEY } = env;
   const base = `${SUPABASE_URL}/rest/v1/bookings`;
   const auth = {
     "apikey": SUPABASE_ANON_KEY,
@@ -36,6 +38,12 @@ export async function onRequest({ request, env }) {
   }
 
   if (request.method === "DELETE" && id) {
+    const expectedAdminKey = ADMIN_API_KEY || SUPABASE_ANON_KEY;
+    const providedKey = request.headers.get("x-admin-key") || "";
+    if (!expectedAdminKey || providedKey !== expectedAdminKey) {
+      return new Response(null, { status: 401, headers: CORS });
+    }
+
     const res = await fetch(`${base}?id=eq.${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: auth,

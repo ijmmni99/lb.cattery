@@ -79,6 +79,15 @@ h1 {
   color: var(--brand-muted);
 }
 
+.nav-link-row {
+  margin-top: 0.75rem;
+}
+
+.nav-link-row a {
+  color: var(--brand-primary-dark);
+  font-weight: 700;
+}
+
 .layout {
   max-width: 1120px;
   margin: 0 auto;
@@ -86,6 +95,10 @@ h1 {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 1rem;
+}
+
+.admin-layout {
+  grid-template-columns: 1fr 1fr;
 }
 
 .card {
@@ -143,6 +156,16 @@ textarea {
   padding: 0.62rem 0.7rem;
   background: #fffdfb;
   color: var(--brand-ink);
+}
+
+td input[type="text"],
+td input[type="number"] {
+  width: 100%;
+  min-width: 120px;
+}
+
+td input[type="checkbox"] {
+  transform: scale(1.1);
 }
 
 input:focus,
