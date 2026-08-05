@@ -554,6 +554,7 @@ th {
   border-radius: 12px;
   overflow: auto;
   background: #fffdf9;
+  margin-top: 0.85rem;
 }
 
 .admin-panel .actions-row {

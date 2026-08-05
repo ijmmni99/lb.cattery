@@ -266,6 +266,16 @@ async function loadUpcomingBookings() {
   showUpcomingStatus(`Showing ${upcoming.length} upcoming booking(s).`, true);
 }
 
+async function enterWorkspace() {
+  setLoginCardVisible(false);
+  setWorkspaceVisible(true);
+  setActivePanel("panel-upcoming");
+  showWorkspaceStatus("Select a section on the left to manage configuration.", true);
+  const settings = await fetchSettings();
+  applySettingsToForm(settings);
+  await loadUpcomingBookings();
+}
+
 async function login() {
   const username = usernameInput.value.trim();
   const password = passwordInput.value;
@@ -290,14 +300,26 @@ async function login() {
   const data = await res.json();
   setAdminToken(data.token);
   passwordInput.value = "";
-  setLoginCardVisible(false);
-  setWorkspaceVisible(true);
-  setActivePanel("panel-upcoming");
   showStatus("Signed in as administrator.", true);
-  showWorkspaceStatus("Select a section on the left to manage configuration.", true);
-  const settings = await fetchSettings();
-  applySettingsToForm(settings);
-  await loadUpcomingBookings();
+  await enterWorkspace();
+}
+
+async function restoreSession() {
+  const token = getAdminToken();
+  if (!token) return false;
+
+  const res = await fetch("/api/admin-login", {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) {
+    clearAdminToken();
+    return false;
+  }
+
+  await enterWorkspace();
+  return true;
 }
 
 function logout() {
@@ -418,11 +440,14 @@ saveSuitesBtn.addEventListener("click", saveSettings);
 saveAddonsBtn.addEventListener("click", saveSettings);
 
 async function init() {
-  clearAdminToken();
-  setLoginCardVisible(true);
   setWorkspaceVisible(false);
   setActivePanel("panel-upcoming");
-  showStatus("Please sign in with administrator account.", false);
+
+  const restored = await restoreSession();
+  if (!restored) {
+    setLoginCardVisible(true);
+    showStatus("Please sign in with administrator account.", false);
+  }
 }
 
 init();
