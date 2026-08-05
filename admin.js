@@ -136,6 +136,17 @@ function createCellCheckbox(checked) {
   return input;
 }
 
+function createDeleteButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "action-btn delete";
+  button.textContent = "Delete";
+  button.addEventListener("click", () => {
+    button.closest("tr")?.remove();
+  });
+  return button;
+}
+
 function createTableRow(cells, labels = []) {
   const tr = document.createElement("tr");
   cells.forEach((cell, index) => {
@@ -157,7 +168,8 @@ function renderSuiteRows(suites) {
       createCellInput(suite.nightlyRate, "number"),
       createCellInput(suite.capacity, "number", "1"),
       createCellCheckbox(suite.active),
-    ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Active"]);
+      createDeleteButton(),
+    ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Active", ""]);
     suiteRowsEl.appendChild(row);
   });
 }
@@ -171,7 +183,8 @@ function renderAddonRows(addons) {
       createCellInput(addon.flatFee, "number"),
       createCellInput(addon.nightlyFee, "number"),
       createCellCheckbox(addon.active),
-    ], ["Code", "Name", "Flat Fee (MYR)", "Nightly Fee (MYR)", "Active"]);
+      createDeleteButton(),
+    ], ["Code", "Name", "Flat Fee (MYR)", "Nightly Fee (MYR)", "Active", ""]);
     addonRowsEl.appendChild(row);
   });
 }
@@ -270,7 +283,6 @@ async function enterWorkspace() {
   setLoginCardVisible(false);
   setWorkspaceVisible(true);
   setActivePanel("panel-upcoming");
-  showWorkspaceStatus("Select a section on the left to manage configuration.", true);
   const settings = await fetchSettings();
   applySettingsToForm(settings);
   await loadUpcomingBookings();
@@ -419,7 +431,8 @@ addSuiteBtn.addEventListener("click", () => {
     createCellInput(0, "number"),
     createCellInput(1, "number", "1"),
     createCellCheckbox(true),
-  ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Active"]);
+    createDeleteButton(),
+  ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Active", ""]);
   suiteRowsEl.appendChild(row);
 });
 
@@ -430,7 +443,8 @@ addAddonBtn.addEventListener("click", () => {
     createCellInput(0, "number"),
     createCellInput(0, "number"),
     createCellCheckbox(true),
-  ], ["Code", "Name", "Flat Fee (MYR)", "Nightly Fee (MYR)", "Active"]);
+    createDeleteButton(),
+  ], ["Code", "Name", "Flat Fee (MYR)", "Nightly Fee (MYR)", "Active", ""]);
   addonRowsEl.appendChild(row);
 });
 

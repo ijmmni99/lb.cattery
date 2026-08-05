@@ -39,70 +39,6 @@
     </header>
 
     <main class="layout">
-      <section class="card" id="booking-card">
-        <h2>Create Reservation</h2>
-        <p id="form-mode" class="form-mode">Bookings are open.</p>
-        <form id="booking-form">
-          <div class="grid two">
-            <label>
-              Owner name
-              <input type="text" name="ownerName" required />
-            </label>
-            <label>
-              Contact email
-              <input type="email" name="ownerEmail" required />
-            </label>
-            <label>
-              Contact phone
-              <input type="tel" name="ownerPhone" required />
-            </label>
-            <label>
-              Cat name
-              <input type="text" name="catName" required />
-            </label>
-            <label>
-              Breed
-              <input type="text" name="breed" required />
-            </label>
-            <label>
-              Age (years)
-              <input type="number" name="age" min="0" max="30" step="0.5" required />
-            </label>
-            <label>
-              Check-in
-              <input type="date" name="checkIn" required />
-            </label>
-            <label>
-              Check-out
-              <input type="date" name="checkOut" required />
-            </label>
-            <label>
-              Suite type
-              <select name="suiteType" required></select>
-            </label>
-            <label>
-              Add-ons
-              <select name="addOn"></select>
-            </label>
-          </div>
-
-          <label>
-            Special care notes
-            <textarea name="notes" rows="3" placeholder="Diet, medication, behavior, preferences"></textarea>
-          </label>
-
-          <div class="price-panel">
-            <div>
-              <p class="price-label">Estimated total</p>
-              <p id="estimated-total" class="price-value">RM0.00</p>
-            </div>
-            <div class="actions-row">
-              <button type="submit" id="submit-booking">Confirm Reservation</button>
-            </div>
-          </div>
-        </form>
-      </section>
-
       <section class="card" id="availability-card">
         <h2>Availability Checker</h2>
         <div class="grid two">
@@ -133,6 +69,89 @@
           <button id="cal-next" type="button" class="secondary">Next</button>
         </div>
         <div id="availability-calendar" class="availability-calendar" aria-live="polite"></div>
+      </section>
+
+      <section class="card" id="booking-card">
+        <h2>Create Reservation</h2>
+        <p id="form-mode" class="form-mode">Bookings are open.</p>
+        <p id="step-indicator" class="step-indicator" aria-live="polite"></p>
+        <form id="booking-form" novalidate>
+          <div class="form-step" data-step="0">
+            <div class="grid two">
+              <label>
+                Suite type
+                <select name="suiteType" required></select>
+              </label>
+              <label>
+                Add-ons
+                <select name="addOn"></select>
+              </label>
+              <label>
+                Check-in
+                <input type="date" name="checkIn" required />
+              </label>
+              <label>
+                Check-out
+                <input type="date" name="checkOut" required />
+              </label>
+            </div>
+          </div>
+
+          <div class="form-step" data-step="1" hidden>
+            <div class="grid two">
+              <label>
+                Cat name
+                <input type="text" name="catName" required />
+              </label>
+              <label>
+                Breed
+                <input type="text" name="breed" required />
+              </label>
+              <label>
+                Age (years)
+                <input type="number" name="age" min="0" max="30" step="0.5" required />
+              </label>
+            </div>
+            <label>
+              Special care notes
+              <textarea name="notes" rows="3" placeholder="Diet, medication, behavior, preferences"></textarea>
+            </label>
+          </div>
+
+          <div class="form-step" data-step="2" hidden>
+            <div class="grid two">
+              <label>
+                Owner name
+                <input type="text" name="ownerName" required />
+              </label>
+              <label>
+                Contact email
+                <input type="email" name="ownerEmail" required />
+              </label>
+              <label>
+                Contact phone
+                <input type="tel" name="ownerPhone" required />
+              </label>
+            </div>
+          </div>
+
+          <div class="form-step" data-step="3" hidden>
+            <h3>Review your reservation</h3>
+            <dl id="booking-summary" class="booking-summary"></dl>
+          </div>
+
+          <div class="price-panel">
+            <div>
+              <p class="price-label">Estimated total</p>
+              <p id="estimated-total" class="price-value">RM0.00</p>
+            </div>
+            <div class="actions-row">
+              <button type="button" id="step-back" class="secondary" hidden>Back</button>
+              <button type="button" id="step-next">Next</button>
+              <button type="submit" id="submit-booking" hidden>Confirm Reservation</button>
+            </div>
+          </div>
+        </form>
       </section>
     </main>
 

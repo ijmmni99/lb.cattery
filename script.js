@@ -35,6 +35,15 @@ const addOnSelect = bookingForm.elements.namedItem("addOn");
 const priceGuideEl = document.getElementById("price-guide");
 const accountMenuBtn = document.getElementById("account-menu-btn");
 const accountMenu = document.getElementById("account-menu");
+const stepIndicatorEl = document.getElementById("step-indicator");
+const stepEls = Array.from(document.querySelectorAll(".form-step"));
+const stepBackBtn = document.getElementById("step-back");
+const stepNextBtn = document.getElementById("step-next");
+const submitBookingBtn = document.getElementById("submit-booking");
+const bookingSummaryEl = document.getElementById("booking-summary");
+
+const STEP_LABELS = ["Suite & Dates", "Cat Details", "Contact Info", "Review & Confirm"];
+let currentStep = 0;
 
 const calendarState = {
   year: new Date().getFullYear(),
@@ -377,6 +386,104 @@ function applyBookingStatus() {
     : "Bookings are temporarily closed. Please contact the administrator.";
 }
 
+function validateStepFields(index) {
+  const inputs = stepEls[index].querySelectorAll("input, select, textarea");
+  for (const el of inputs) {
+    if (!el.reportValidity()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async function validateBookingRules() {
+  const formData = Object.fromEntries(new FormData(bookingForm).entries());
+  const nights = daysBetween(formData.checkIn, formData.checkOut);
+
+  if (parseDate(formData.checkOut) <= parseDate(formData.checkIn)) {
+    alert("Check-out date must be after check-in date.");
+    return false;
+  }
+
+  if (nights < settings.booking.minNights) {
+    alert(`Minimum stay is ${settings.booking.minNights} night(s).`);
+    return false;
+  }
+
+  if (nights > settings.booking.maxNights) {
+    alert(`Maximum stay is ${settings.booking.maxNights} night(s).`);
+    return false;
+  }
+
+  const bookings = await getBookings();
+  if (!(await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings))) {
+    alert("Those dates are currently unavailable. Please choose another range.");
+    return false;
+  }
+
+  return true;
+}
+
+function renderBookingSummary() {
+  const formData = Object.fromEntries(new FormData(bookingForm).entries());
+  const suite = suiteByCode(formData.suiteType);
+  const addon = addonByCode(formData.addOn);
+  const nights = Math.max(0, daysBetween(formData.checkIn, formData.checkOut));
+
+  const rows = [
+    ["Owner", `${formData.ownerName} · ${formData.ownerPhone}`],
+    ["Contact email", formData.ownerEmail],
+    ["Cat", `${formData.catName} (${formData.breed}, ${formData.age}y)`],
+    ["Stay", `${formData.checkIn} to ${formData.checkOut} (${nights} night${nights === 1 ? "" : "s"})`],
+    ["Suite", suite ? suite.name : formData.suiteType],
+    ["Add-on", addon ? addon.name : "None"],
+  ];
+  if (formData.notes) rows.push(["Notes", formData.notes]);
+
+  bookingSummaryEl.innerHTML = "";
+  rows.forEach(([label, value]) => {
+    const dt = document.createElement("dt");
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.textContent = value;
+    bookingSummaryEl.append(dt, dd);
+  });
+}
+
+function showStep(index) {
+  currentStep = index;
+  const isLast = index === stepEls.length - 1;
+
+  stepEls.forEach((el, i) => {
+    el.hidden = i !== index;
+  });
+
+  stepIndicatorEl.textContent = `Step ${index + 1} of ${stepEls.length}: ${STEP_LABELS[index]}`;
+  stepBackBtn.hidden = index === 0;
+  stepNextBtn.hidden = isLast;
+  submitBookingBtn.hidden = !isLast;
+
+  if (isLast) renderBookingSummary();
+}
+
+stepNextBtn.addEventListener("click", async () => {
+  if (!validateStepFields(currentStep)) return;
+  if (currentStep === 0 && !(await validateBookingRules())) return;
+  showStep(currentStep + 1);
+});
+
+stepBackBtn.addEventListener("click", () => {
+  showStep(Math.max(0, currentStep - 1));
+});
+
+bookingForm.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.target.tagName === "TEXTAREA") return;
+  if (currentStep < stepEls.length - 1) {
+    event.preventDefault();
+    stepNextBtn.click();
+  }
+});
+
 bookingForm.addEventListener("input", refreshEstimate);
 
 bookingForm.addEventListener("submit", async (event) => {
@@ -387,30 +494,9 @@ bookingForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  if (!(await validateBookingRules())) return;
+
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
-  const nights = daysBetween(formData.checkIn, formData.checkOut);
-
-  if (parseDate(formData.checkOut) <= parseDate(formData.checkIn)) {
-    alert("Check-out date must be after check-in date.");
-    return;
-  }
-
-  if (nights < settings.booking.minNights) {
-    alert(`Minimum stay is ${settings.booking.minNights} night(s).`);
-    return;
-  }
-
-  if (nights > settings.booking.maxNights) {
-    alert(`Maximum stay is ${settings.booking.maxNights} night(s).`);
-    return;
-  }
-
-  const bookings = await getBookings();
-  if (!(await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings))) {
-    alert("Those dates are currently unavailable. Please choose another range.");
-    return;
-  }
-
   const booking = {
     ...formData,
     id: `LB-${Date.now().toString().slice(-6)}`,
@@ -421,6 +507,7 @@ bookingForm.addEventListener("submit", async (event) => {
   availabilitySuite.value = formData.suiteType;
   bookingForm.reset();
   refreshEstimate();
+  showStep(0);
   await renderBlockedRanges(availabilitySuite.value);
   await renderAvailabilityCalendar();
   showAvailabilityMessage("Reservation confirmed and dates are now blocked.", true);
@@ -490,6 +577,7 @@ async function init() {
   renderPriceGuide();
   applyBookingStatus();
   refreshEstimate();
+  showStep(0);
   await renderBlockedRanges(availabilitySuite.value);
   await renderAvailabilityCalendar();
 }
