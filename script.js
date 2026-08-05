@@ -10,7 +10,6 @@ const DEFAULT_SETTINGS = {
     { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, active: true },
   ],
   addons: [
-    { code: "none", name: "No add-on", flatFee: 0, nightlyFee: 0, active: true },
     { code: "grooming", name: "Grooming Package", flatFee: 18, nightlyFee: 0, active: true },
     { code: "playtime", name: "Extended Playtime", flatFee: 0, nightlyFee: 10, active: true },
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
@@ -31,7 +30,9 @@ const calPrevBtn = document.getElementById("cal-prev");
 const calNextBtn = document.getElementById("cal-next");
 const formModeEl = document.getElementById("form-mode");
 const suiteSelect = bookingForm.elements.namedItem("suiteType");
-const addOnSelect = bookingForm.elements.namedItem("addOn");
+const addonOptionsEl = document.getElementById("addon-options");
+const catRowsEl = document.getElementById("cat-rows");
+const addCatBtn = document.getElementById("add-cat");
 const priceGuideEl = document.getElementById("price-guide");
 const accountMenuBtn = document.getElementById("account-menu-btn");
 const accountMenu = document.getElementById("account-menu");
@@ -115,13 +116,19 @@ async function getBookings() {
     ownerName: r.owner_name,
     ownerEmail: r.owner_email,
     ownerPhone: r.owner_phone,
-    catName: r.cat_name,
-    breed: r.breed,
-    age: r.age,
+    cats: Array.isArray(r.cats) && r.cats.length
+      ? r.cats
+      : r.cat_name
+        ? [{ name: r.cat_name, breed: r.breed, age: r.age }]
+        : [],
     suiteType: r.suite_type,
     checkIn: r.check_in,
     checkOut: r.check_out,
-    addOn: r.add_on,
+    addOns: Array.isArray(r.add_ons) && r.add_ons.length
+      ? r.add_ons
+      : r.add_on
+        ? [r.add_on]
+        : [],
     totalPrice: r.total_price,
     notes: r.notes,
   }));
@@ -136,13 +143,11 @@ async function saveBooking(booking) {
       owner_name: booking.ownerName,
       owner_email: booking.ownerEmail,
       owner_phone: booking.ownerPhone,
-      cat_name: booking.catName,
-      breed: booking.breed,
-      age: booking.age,
+      cats: booking.cats,
       suite_type: booking.suiteType,
       check_in: booking.checkIn,
       check_out: booking.checkOut,
-      add_on: booking.addOn,
+      add_ons: booking.addOns,
       total_price: booking.totalPrice,
       notes: booking.notes || null,
     }),
@@ -211,15 +216,90 @@ function renderSelectOptions() {
     availabilitySuite.appendChild(optionB);
   });
 
-  const addonOptions = settings.addons.filter((addon) => addon.active);
-  addOnSelect.innerHTML = "";
+  const addonOptions = settings.addons.filter((addon) => addon.active && addon.code !== "none");
+  addonOptionsEl.innerHTML = "";
   addonOptions.forEach((addon) => {
-    const option = document.createElement("option");
-    option.value = addon.code;
-    option.textContent = addon.name;
-    addOnSelect.appendChild(option);
+    const label = document.createElement("label");
+    label.className = "addon-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.name = "addOn";
+    checkbox.value = addon.code;
+    label.append(checkbox, document.createTextNode(addon.name));
+    addonOptionsEl.appendChild(label);
   });
 }
+
+function createCatRow() {
+  const row = document.createElement("div");
+  row.className = "cat-card";
+
+  const header = document.createElement("div");
+  header.className = "cat-card-header";
+  const title = document.createElement("strong");
+  title.textContent = "Cat";
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "secondary remove-cat-btn";
+  removeBtn.textContent = "Remove";
+  removeBtn.addEventListener("click", () => {
+    row.remove();
+    updateCatRowChrome();
+  });
+  header.append(title, removeBtn);
+
+  const fields = document.createElement("div");
+  fields.className = "grid two";
+  fields.innerHTML = `
+    <label>
+      Cat name
+      <input type="text" name="catName[]" required />
+    </label>
+    <label>
+      Breed
+      <input type="text" name="breed[]" required />
+    </label>
+    <label>
+      Age (years)
+      <input type="number" name="age[]" min="0" max="30" step="0.5" required />
+    </label>
+  `;
+
+  row.append(header, fields);
+  return row;
+}
+
+function updateCatRowChrome() {
+  const rows = Array.from(catRowsEl.querySelectorAll(".cat-card"));
+  rows.forEach((row, index) => {
+    row.querySelector(".cat-card-header strong").textContent = `Cat ${index + 1}`;
+    const removeBtn = row.querySelector(".remove-cat-btn");
+    removeBtn.hidden = rows.length <= 1;
+  });
+}
+
+function addCatRow() {
+  catRowsEl.appendChild(createCatRow());
+  updateCatRowChrome();
+}
+
+function resetCatRows() {
+  catRowsEl.innerHTML = "";
+  addCatRow();
+}
+
+function collectCats() {
+  const names = Array.from(catRowsEl.querySelectorAll('input[name="catName[]"]')).map((el) => el.value.trim());
+  const breeds = Array.from(catRowsEl.querySelectorAll('input[name="breed[]"]')).map((el) => el.value.trim());
+  const ages = Array.from(catRowsEl.querySelectorAll('input[name="age[]"]')).map((el) => el.value);
+  return names.map((name, index) => ({ name, breed: breeds[index] || "", age: ages[index] || "" }));
+}
+
+function collectAddOns() {
+  return Array.from(addonOptionsEl.querySelectorAll('input[name="addOn"]:checked')).map((el) => el.value);
+}
+
+addCatBtn.addEventListener("click", addCatRow);
 
 function renderPriceGuide() {
   const suiteItems = settings.suites
@@ -260,15 +340,17 @@ async function isDateRangeAvailable(start, end, suiteType, currentBookings = nul
   return overlapsInSuite < (suiteCapacity[suiteType] || 1);
 }
 
-function calculateEstimate(formData) {
+function calculateEstimate(formData, addOnCodes = []) {
   const nights = Math.max(0, daysBetween(formData.checkIn, formData.checkOut));
   const suite = suiteByCode(formData.suiteType);
-  const addon = addonByCode(formData.addOn);
   if (!suite) return 0;
   const suiteTotal = suite.nightlyRate * nights;
-  const addonFlat = addon?.flatFee || 0;
-  const addonNightly = (addon?.nightlyFee || 0) * nights;
-  return suiteTotal + addonFlat + addonNightly;
+  const addonsTotal = addOnCodes.reduce((sum, code) => {
+    const addon = addonByCode(code);
+    if (!addon) return sum;
+    return sum + (addon.flatFee || 0) + (addon.nightlyFee || 0) * nights;
+  }, 0);
+  return suiteTotal + addonsTotal;
 }
 
 function getMonthBounds(year, month) {
@@ -350,7 +432,7 @@ function refreshEstimate() {
     estimatedTotalEl.textContent = formatMoney(0);
     return;
   }
-  estimatedTotalEl.textContent = formatMoney(calculateEstimate(formData));
+  estimatedTotalEl.textContent = formatMoney(calculateEstimate(formData, collectAddOns()));
 }
 
 function showAvailabilityMessage(message, ok) {
@@ -435,16 +517,18 @@ async function validateBookingRules() {
 function renderBookingSummary() {
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
   const suite = suiteByCode(formData.suiteType);
-  const addon = addonByCode(formData.addOn);
+  const cats = collectCats();
+  const addOnCodes = collectAddOns();
+  const addonNames = addOnCodes.map((code) => addonByCode(code)?.name).filter(Boolean);
   const nights = Math.max(0, daysBetween(formData.checkIn, formData.checkOut));
 
   const rows = [
     ["Owner", `${formData.ownerName} · ${formData.ownerPhone}`],
     ["Contact email", formData.ownerEmail],
-    ["Cat", `${formData.catName} (${formData.breed}, ${formData.age}y)`],
+    ["Cats", cats.map((cat) => `${cat.name} (${cat.breed}, ${cat.age}y)`).join("; ") || "-"],
     ["Stay", `${formData.checkIn} to ${formData.checkOut} (${nights} night${nights === 1 ? "" : "s"})`],
     ["Suite", suite ? suite.name : formData.suiteType],
-    ["Add-on", addon ? addon.name : "None"],
+    ["Add-ons", addonNames.length ? addonNames.join(", ") : "None"],
   ];
   if (formData.notes) rows.push(["Notes", formData.notes]);
 
@@ -519,15 +603,19 @@ bookingForm.addEventListener("submit", async (event) => {
   if (!(await validateBookingRules())) return;
 
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
+  const addOns = collectAddOns();
   const booking = {
     ...formData,
+    cats: collectCats(),
+    addOns,
     id: `LB-${Date.now().toString().slice(-6)}`,
-    totalPrice: calculateEstimate(formData),
+    totalPrice: calculateEstimate(formData, addOns),
   };
 
   await saveBooking(booking);
   availabilitySuite.value = formData.suiteType;
   bookingForm.reset();
+  resetCatRows();
   refreshEstimate();
   showStep(0);
   await renderBlockedRanges(availabilitySuite.value);
@@ -599,6 +687,7 @@ calNextBtn.addEventListener("click", async () => {
 async function init() {
   settings = await getSettings();
   renderSelectOptions();
+  resetCatRows();
   renderPriceGuide();
   applyBookingStatus();
   refreshEstimate();

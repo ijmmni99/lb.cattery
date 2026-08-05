@@ -16,10 +16,25 @@ function validateBookingPayload(body) {
   if (!DATE_PATTERN.test(body.check_out || "")) return "Invalid check-out date";
   if (!EMAIL_PATTERN.test(body.owner_email || "")) return "Invalid owner email";
   if (!String(body.owner_name || "").trim()) return "Owner name is required";
-  if (!String(body.cat_name || "").trim()) return "Cat name is required";
   if (!String(body.suite_type || "").trim()) return "Suite type is required";
 
-  const textFields = ["owner_name", "owner_phone", "cat_name", "breed", "suite_type", "add_on", "notes"];
+  if (!Array.isArray(body.cats) || !body.cats.length) return "At least one cat is required";
+  if (body.cats.length > 20) return "Too many cats on one booking";
+  for (const cat of body.cats) {
+    if (!cat || typeof cat !== "object" || !String(cat.name || "").trim()) return "Each cat needs a name";
+    if (String(cat.name || "").length > 200) return "Cat name is too long";
+    if (String(cat.breed || "").length > 200) return "Breed is too long";
+  }
+
+  if (body.add_ons !== undefined) {
+    if (!Array.isArray(body.add_ons)) return "Invalid add-ons";
+    if (body.add_ons.length > 20) return "Too many add-ons on one booking";
+    for (const addOn of body.add_ons) {
+      if (typeof addOn !== "string" || addOn.length > 100) return "Invalid add-on";
+    }
+  }
+
+  const textFields = ["owner_name", "owner_phone", "suite_type", "notes"];
   for (const field of textFields) {
     if (String(body[field] || "").length > 500) return `${field} is too long`;
   }
@@ -53,7 +68,10 @@ async function sendBookingConfirmationEmail(env, auth, booking) {
 
   const { suites, addons } = await lookupNames(env, auth);
   const suite = suites.find((s) => s.code === booking.suite_type);
-  const addon = addons.find((a) => a.code === booking.add_on);
+  const cats = Array.isArray(booking.cats) ? booking.cats : [];
+  const catNames = cats.map((cat) => cat.name).filter(Boolean).join(", ") || "your cat";
+  const addOnCodes = Array.isArray(booking.add_ons) ? booking.add_ons : [];
+  const addOnNames = addOnCodes.map((code) => addons.find((a) => a.code === code)?.name).filter(Boolean).join(", ");
   const formattedTotal = new Intl.NumberFormat("ms-MY", {
     style: "currency",
     currency: "MYR",
@@ -72,11 +90,11 @@ async function sendBookingConfirmationEmail(env, auth, booking) {
       subject: `Booking confirmed - ${booking.id}`,
       html: `
         <p>Hi ${escapeHtml(booking.owner_name) || "there"},</p>
-        <p>Your reservation for <strong>${escapeHtml(booking.cat_name) || "your cat"}</strong> is confirmed.</p>
+        <p>Your reservation for <strong>${escapeHtml(catNames)}</strong> is confirmed.</p>
         <ul>
           <li>Booking ID: <strong>${escapeHtml(booking.id)}</strong></li>
           <li>Suite: ${escapeHtml(suite ? suite.name : booking.suite_type)}</li>
-          <li>Add-on: ${escapeHtml(addon ? addon.name : booking.add_on || "None")}</li>
+          <li>Add-ons: ${escapeHtml(addOnNames || "None")}</li>
           <li>Stay: ${escapeHtml(booking.check_in)} to ${escapeHtml(booking.check_out)}</li>
           <li>Total: ${formattedTotal}</li>
         </ul>

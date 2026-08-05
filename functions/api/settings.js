@@ -19,7 +19,6 @@ const DEFAULT_SETTINGS = {
     { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, active: true },
   ],
   addons: [
-    { code: "none", name: "No add-on", flatFee: 0, nightlyFee: 0, active: true },
     { code: "grooming", name: "Grooming Package", flatFee: 18, nightlyFee: 0, active: true },
     { code: "playtime", name: "Extended Playtime", flatFee: 0, nightlyFee: 10, active: true },
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
