@@ -364,17 +364,23 @@ async function renderBlockedRanges(suiteType) {
     .filter((booking) => booking.suiteType === suiteType)
     .sort((a, b) => parseDate(a.checkIn) - parseDate(b.checkIn));
 
+  blockedRangesEl.innerHTML = "";
+  const heading = document.createElement("strong");
+  heading.textContent = "Booked date blocks:";
+  blockedRangesEl.appendChild(heading);
+
   if (!bookings.length) {
-    blockedRangesEl.innerHTML = "<strong>Booked date blocks:</strong> none yet for this suite.";
+    blockedRangesEl.append(" none yet for this suite.");
     return;
   }
 
-  const items = bookings
-    .slice(0, 6)
-    .map((booking) => `<li>${booking.checkIn} to ${booking.checkOut}</li>`)
-    .join("");
-
-  blockedRangesEl.innerHTML = `<strong>Booked date blocks:</strong><ul>${items}</ul>`;
+  const list = document.createElement("ul");
+  bookings.slice(0, 6).forEach((booking) => {
+    const li = document.createElement("li");
+    li.textContent = `${booking.checkIn} to ${booking.checkOut}`;
+    list.appendChild(li);
+  });
+  blockedRangesEl.appendChild(list);
 }
 
 function applyBookingStatus() {

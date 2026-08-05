@@ -7,6 +7,26 @@ const CORS = {
   "Content-Type": "application/json",
 };
 
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateBookingPayload(body) {
+  if (!body || typeof body !== "object") return "Invalid booking payload";
+  if (!DATE_PATTERN.test(body.check_in || "")) return "Invalid check-in date";
+  if (!DATE_PATTERN.test(body.check_out || "")) return "Invalid check-out date";
+  if (!EMAIL_PATTERN.test(body.owner_email || "")) return "Invalid owner email";
+  if (!String(body.owner_name || "").trim()) return "Owner name is required";
+  if (!String(body.cat_name || "").trim()) return "Cat name is required";
+  if (!String(body.suite_type || "").trim()) return "Suite type is required";
+
+  const textFields = ["owner_name", "owner_phone", "cat_name", "breed", "suite_type", "add_on", "notes"];
+  for (const field of textFields) {
+    if (String(body[field] || "").length > 500) return `${field} is too long`;
+  }
+
+  return null;
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -100,7 +120,12 @@ export async function onRequest({ request, env }) {
   }
 
   if (request.method === "POST") {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    const validationError = validateBookingPayload(body);
+    if (validationError) {
+      return new Response(JSON.stringify({ error: validationError }), { status: 400, headers: CORS });
+    }
+
     const res = await fetch(base, {
       method: "POST",
       headers: { ...auth, "Prefer": "resolution=merge-duplicates,return=minimal" },
