@@ -361,7 +361,9 @@ async function saveSettings() {
     logout();
     showStatus("Session expired. Please sign in again.", false);
   } else {
-    showWorkspaceStatus("Failed to save settings. Check backend logs/table setup.", false);
+    const errorBody = await res.json().catch(() => null);
+    const detail = errorBody?.detail || errorBody?.error || "Check backend logs/table setup.";
+    showWorkspaceStatus(`Failed to save settings. ${detail}`, false);
   }
 }
 

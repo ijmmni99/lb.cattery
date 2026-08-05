@@ -148,7 +148,11 @@ export async function onRequest({ request, env }) {
     });
 
     if (!res.ok) {
-      return new Response(JSON.stringify({ error: "Failed to save settings" }), { status: 500, headers: CORS });
+      const detail = await res.text().catch(() => "");
+      return new Response(
+        JSON.stringify({ error: "Failed to save settings", status: res.status, detail }),
+        { status: 500, headers: CORS },
+      );
     }
 
     return new Response(JSON.stringify({ ok: true }), { headers: CORS });
