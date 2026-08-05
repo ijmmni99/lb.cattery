@@ -33,9 +33,10 @@ export async function onRequest({ request, env }) {
   }
 
   const base = `${env.SUPABASE_URL}/rest/v1/bookings`;
+  const restKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
   const auth = {
-    apikey: env.SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
+    apikey: restKey,
+    Authorization: `Bearer ${restKey}`,
     "Content-Type": "application/json",
   };
 

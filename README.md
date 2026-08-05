@@ -21,6 +21,7 @@ Environment variables:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (recommended for backend function table access)
 - `ADMIN_API_KEY` (optional; used for protected save/delete operations)
 - `ADMIN_USERNAME` (optional, default: `admin`)
 - `ADMIN_PASSWORD` (recommended; if missing, fallback uses `ADMIN_API_KEY` then `SUPABASE_ANON_KEY`)

@@ -12,9 +12,10 @@ function getUserSecret(env) {
 }
 
 function getSupabaseAuth(env) {
+  const restKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
   return {
-    apikey: env.SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
+    apikey: restKey,
+    Authorization: `Bearer ${restKey}`,
     "Content-Type": "application/json",
   };
 }
@@ -69,7 +70,16 @@ export async function onRequest({ request, env }) {
 
     const existingRes = await fetch(`${usersBase}?email=eq.${encodeURIComponent(email)}&select=id&limit=1`, { headers: auth });
     if (!existingRes.ok) {
-      return new Response(JSON.stringify({ error: "Failed to validate user" }), { status: 500, headers: CORS });
+      const detail = await existingRes.text();
+      return new Response(
+        JSON.stringify({
+          error: "Failed to validate user",
+          hint: "Check table public.app_users exists and API key has select permission.",
+          status: existingRes.status,
+          detail,
+        }),
+        { status: 500, headers: CORS },
+      );
     }
 
     const existingRows = await existingRes.json();
@@ -97,7 +107,16 @@ export async function onRequest({ request, env }) {
     });
 
     if (!insertRes.ok) {
-      return new Response(JSON.stringify({ error: "Failed to create user" }), { status: 500, headers: CORS });
+      const detail = await insertRes.text();
+      return new Response(
+        JSON.stringify({
+          error: "Failed to create user",
+          hint: "Check app_users schema, unique email constraint, and insert permission.",
+          status: insertRes.status,
+          detail,
+        }),
+        { status: 500, headers: CORS },
+      );
     }
 
     const token = await createSessionToken(email, userSecret, 12 * 60 * 60 * 1000, { name: fullName, role: "user" });
@@ -118,7 +137,16 @@ export async function onRequest({ request, env }) {
     );
 
     if (!res.ok) {
-      return new Response(JSON.stringify({ error: "Login service unavailable" }), { status: 500, headers: CORS });
+      const detail = await res.text();
+      return new Response(
+        JSON.stringify({
+          error: "Login service unavailable",
+          hint: "Check table public.app_users exists and API key has select permission.",
+          status: res.status,
+          detail,
+        }),
+        { status: 500, headers: CORS },
+      );
     }
 
     const rows = await res.json();
