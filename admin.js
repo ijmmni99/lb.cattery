@@ -42,6 +42,9 @@ const addonRowsEl = document.getElementById("addon-rows");
 const addSuiteBtn = document.getElementById("add-suite");
 const addAddonBtn = document.getElementById("add-addon");
 const saveSettingsBtn = document.getElementById("save-settings");
+const saveBookingBtn = document.getElementById("save-booking");
+const saveSuitesBtn = document.getElementById("save-suites");
+const saveAddonsBtn = document.getElementById("save-addons");
 
 function getAdminToken() {
   return localStorage.getItem("lb_admin_token") || "";
@@ -78,6 +81,9 @@ function setWorkspaceVisible(visible) {
   saveSettingsBtn.disabled = !visible;
   addSuiteBtn.disabled = !visible;
   addAddonBtn.disabled = !visible;
+  saveBookingBtn.disabled = !visible;
+  saveSuitesBtn.disabled = !visible;
+  saveAddonsBtn.disabled = !visible;
 }
 
 function setLoginCardVisible(visible) {
@@ -130,10 +136,12 @@ function createCellCheckbox(checked) {
   return input;
 }
 
-function createTableRow(cells) {
+function createTableRow(cells, labels = []) {
   const tr = document.createElement("tr");
-  cells.forEach((cell) => {
+  cells.forEach((cell, index) => {
     const td = document.createElement("td");
+    const label = labels[index];
+    if (label) td.dataset.label = label;
     td.appendChild(cell);
     tr.appendChild(td);
   });
@@ -149,7 +157,7 @@ function renderSuiteRows(suites) {
       createCellInput(suite.nightlyRate, "number"),
       createCellInput(suite.capacity, "number", "1"),
       createCellCheckbox(suite.active),
-    ]);
+    ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Active"]);
     suiteRowsEl.appendChild(row);
   });
 }
@@ -163,7 +171,7 @@ function renderAddonRows(addons) {
       createCellInput(addon.flatFee, "number"),
       createCellInput(addon.nightlyFee, "number"),
       createCellCheckbox(addon.active),
-    ]);
+    ], ["Code", "Name", "Flat Fee (MYR)", "Nightly Fee (MYR)", "Active"]);
     addonRowsEl.appendChild(row);
   });
 }
@@ -215,26 +223,31 @@ function renderUpcomingBookings(rows) {
 
   if (!rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="7">No upcoming bookings found.</td>';
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.textContent = "No upcoming bookings found.";
+    tr.appendChild(td);
     upcomingRowsEl.appendChild(tr);
     return;
   }
 
   rows.forEach((row) => {
-    const tr = document.createElement("tr");
     const ownerLabel = `${row.owner_name || "-"} (${row.owner_phone || "-"})`;
     const catLabel = `${row.cat_name || "-"} (${row.breed || "-"}, ${row.age ?? "-"}y)`;
     const dateLabel = `${row.check_in || "-"} to ${row.check_out || "-"}`;
 
-    tr.innerHTML = `
-      <td>${row.id || "-"}</td>
-      <td>${ownerLabel}</td>
-      <td>${catLabel}</td>
-      <td>${dateLabel}</td>
-      <td>${row.suite_type || "-"}</td>
-      <td>${formatMoney(row.total_price)}</td>
-      <td>${row.notes || "-"}</td>
-    `;
+    const tr = createTableRow(
+      [
+        document.createTextNode(row.id || "-"),
+        document.createTextNode(ownerLabel),
+        document.createTextNode(catLabel),
+        document.createTextNode(dateLabel),
+        document.createTextNode(row.suite_type || "-"),
+        document.createTextNode(formatMoney(row.total_price)),
+        document.createTextNode(row.notes || "-"),
+      ],
+      ["Booking ID", "Owner", "Cat", "Stay Dates", "Suite", "Total (MYR)", "Notes"],
+    );
 
     upcomingRowsEl.appendChild(tr);
   });
@@ -382,7 +395,7 @@ addSuiteBtn.addEventListener("click", () => {
     createCellInput(0, "number"),
     createCellInput(1, "number", "1"),
     createCellCheckbox(true),
-  ]);
+  ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Active"]);
   suiteRowsEl.appendChild(row);
 });
 
@@ -393,11 +406,14 @@ addAddonBtn.addEventListener("click", () => {
     createCellInput(0, "number"),
     createCellInput(0, "number"),
     createCellCheckbox(true),
-  ]);
+  ], ["Code", "Name", "Flat Fee (MYR)", "Nightly Fee (MYR)", "Active"]);
   addonRowsEl.appendChild(row);
 });
 
 saveSettingsBtn.addEventListener("click", saveSettings);
+saveBookingBtn.addEventListener("click", saveSettings);
+saveSuitesBtn.addEventListener("click", saveSettings);
+saveAddonsBtn.addEventListener("click", saveSettings);
 
 async function init() {
   clearAdminToken();

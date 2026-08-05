@@ -506,6 +506,7 @@ th {
   border: 1px solid var(--brand-border);
   min-height: 40px;
   padding: 0.55rem 0.75rem;
+  width: 100%;
 }
 
 .admin-nav-btn.active {
@@ -553,6 +554,14 @@ th {
   border-radius: 12px;
   overflow: auto;
   background: #fffdf9;
+}
+
+.admin-panel .actions-row {
+  margin-top: 0.75rem;
+}
+
+.admin-panel .actions-row button {
+  width: auto;
 }
 
 .admin-page table {
@@ -683,18 +692,13 @@ th {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-panel .actions-row button {
+    width: 100%;
+  }
+
   .admin-toolbar {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .admin-page .actions-row {
-    display: flex;
-    width: auto;
-  }
-
-  .admin-page .actions-row button {
-    width: auto;
   }
 }
 
@@ -814,5 +818,26 @@ th {
 
   .admin-nav {
     grid-template-columns: 1fr;
+  }
+
+  .admin-nav-btn {
+    text-align: center;
+  }
+
+  .admin-panel .actions-row button {
+    width: 100%;
+  }
+
+  .admin-panel .table-wrap {
+    border-radius: 10px;
+  }
+
+  .admin-page th,
+  .admin-page td {
+    white-space: normal;
+  }
+
+  .admin-page td::before {
+    margin-bottom: 0.18rem;
   }
 }
