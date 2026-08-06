@@ -13,7 +13,17 @@ From the admin backend, the system settings are stored in backend and used by th
 - Pricing per suite (nightly rates)
 - Booking configuration (open/close booking, min/max nights)
 - Add-on items (flat and nightly fee)
-- Suites configuration (code, name, capacity, active/inactive)
+- Suites configuration (code, name, capacity, photo, active/inactive)
+
+### Suite photos
+
+Each suite can have an `imageUrl` set from the admin Suites panel. This can
+be any publicly reachable image URL (e.g. hosted on Supabase Storage,
+Imgur, etc.) or a relative path to a file committed under
+[assets/](assets/) (e.g. `assets/standard-suite.jpg`). Suites without an
+image fall back to a placeholder on the public booking form. There is no
+built-in file uploader — paste a URL/path and the admin panel shows a live
+preview thumbnail.
 
 ## Backend Requirements
 

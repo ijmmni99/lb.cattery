@@ -5,9 +5,9 @@ const DEFAULT_SETTINGS = {
     maxNights: 30,
   },
   suites: [
-    { code: "standard", name: "Standard Suite", nightlyRate: 20, capacity: 6, active: true },
-    { code: "deluxe", name: "Deluxe Suite", nightlyRate: 35, capacity: 4, active: true },
-    { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, active: true },
+    { code: "standard", name: "Standard Suite", nightlyRate: 20, capacity: 6, imageUrl: "", active: true },
+    { code: "deluxe", name: "Deluxe Suite", nightlyRate: 35, capacity: 4, imageUrl: "", active: true },
+    { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, imageUrl: "", active: true },
   ],
   addons: [
     { code: "grooming", name: "Grooming Package", flatFee: 18, nightlyFee: 0, active: true },
@@ -135,6 +135,18 @@ function createCellCheckbox(checked) {
   return input;
 }
 
+function createPreviewImage(url) {
+  const img = document.createElement("img");
+  img.className = "suite-preview-thumb";
+  img.alt = "Suite preview";
+  img.src = url || "";
+  img.style.display = url ? "block" : "none";
+  img.addEventListener("error", () => {
+    img.style.display = "none";
+  });
+  return img;
+}
+
 function createDeleteButton() {
   const button = document.createElement("button");
   button.type = "button";
@@ -161,14 +173,24 @@ function createTableRow(cells, labels = []) {
 function renderSuiteRows(suites) {
   suiteRowsEl.innerHTML = "";
   suites.forEach((suite) => {
+    const imageUrlInput = createCellInput(suite.imageUrl || "");
+    imageUrlInput.placeholder = "https://... or assets/suite.jpg";
+    const preview = createPreviewImage(suite.imageUrl || "");
+    imageUrlInput.addEventListener("input", () => {
+      preview.src = imageUrlInput.value.trim();
+      preview.style.display = imageUrlInput.value.trim() ? "block" : "none";
+    });
+
     const row = createTableRow([
       createCellInput(suite.code),
       createCellInput(suite.name),
       createCellInput(suite.nightlyRate, "number"),
       createCellInput(suite.capacity, "number", "1"),
+      imageUrlInput,
+      preview,
       createCellCheckbox(suite.active),
       createDeleteButton(),
-    ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Active", ""]);
+    ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Image URL", "Preview", "Active", ""]);
     suiteRowsEl.appendChild(row);
   });
 }
@@ -197,7 +219,8 @@ function collectSuiteRows() {
         name: (inputs[1].value || "").trim(),
         nightlyRate: Number(inputs[2].value) || 0,
         capacity: Math.max(1, Number(inputs[3].value) || 1),
-        active: inputs[4].checked,
+        imageUrl: (inputs[4].value || "").trim(),
+        active: inputs[5].checked,
       };
     })
     .filter((suite) => suite.code && suite.name);
@@ -443,14 +466,24 @@ if (navEl) {
 refreshUpcomingBtn.addEventListener("click", loadUpcomingBookings);
 
 addSuiteBtn.addEventListener("click", () => {
+  const imageUrlInput = createCellInput("");
+  imageUrlInput.placeholder = "https://... or assets/suite.jpg";
+  const preview = createPreviewImage("");
+  imageUrlInput.addEventListener("input", () => {
+    preview.src = imageUrlInput.value.trim();
+    preview.style.display = imageUrlInput.value.trim() ? "block" : "none";
+  });
+
   const row = createTableRow([
     createCellInput("suite-code"),
     createCellInput("Suite Name"),
     createCellInput(0, "number"),
     createCellInput(1, "number", "1"),
+    imageUrlInput,
+    preview,
     createCellCheckbox(true),
     createDeleteButton(),
-  ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Active", ""]);
+  ], ["Code", "Name", "Nightly Price (MYR)", "Capacity", "Image URL", "Preview", "Active", ""]);
   suiteRowsEl.appendChild(row);
 });
 

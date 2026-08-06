@@ -14,9 +14,9 @@ const DEFAULT_SETTINGS = {
     maxNights: 30,
   },
   suites: [
-    { code: "standard", name: "Standard Suite", nightlyRate: 20, capacity: 6, active: true },
-    { code: "deluxe", name: "Deluxe Suite", nightlyRate: 35, capacity: 4, active: true },
-    { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, active: true },
+    { code: "standard", name: "Standard Suite", nightlyRate: 20, capacity: 6, imageUrl: "", active: true },
+    { code: "deluxe", name: "Deluxe Suite", nightlyRate: 35, capacity: 4, imageUrl: "", active: true },
+    { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, imageUrl: "", active: true },
   ],
   addons: [
     { code: "grooming", name: "Grooming Package", flatFee: 18, nightlyFee: 0, active: true },
@@ -44,6 +44,7 @@ function sanitizeSettings(input) {
         name: String(suite.name || "").trim(),
         nightlyRate: Number(suite.nightlyRate) || 0,
         capacity: Math.max(1, Number(suite.capacity) || 1),
+        imageUrl: String(suite.imageUrl || "").trim().slice(0, 2000),
         active: suite.active !== false,
       }))
       .filter((suite) => suite.code && suite.name),

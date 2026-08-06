@@ -5,9 +5,9 @@ const DEFAULT_SETTINGS = {
     maxNights: 30,
   },
   suites: [
-    { code: "standard", name: "Standard Suite", nightlyRate: 20, capacity: 6, active: true },
-    { code: "deluxe", name: "Deluxe Suite", nightlyRate: 35, capacity: 4, active: true },
-    { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, active: true },
+    { code: "standard", name: "Standard Suite", nightlyRate: 20, capacity: 6, imageUrl: "", active: true },
+    { code: "deluxe", name: "Deluxe Suite", nightlyRate: 35, capacity: 4, imageUrl: "", active: true },
+    { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, imageUrl: "", active: true },
   ],
   addons: [
     { code: "grooming", name: "Grooming Package", flatFee: 18, nightlyFee: 0, active: true },
@@ -29,7 +29,7 @@ const calendarEl = document.getElementById("availability-calendar");
 const calPrevBtn = document.getElementById("cal-prev");
 const calNextBtn = document.getElementById("cal-next");
 const formModeEl = document.getElementById("form-mode");
-const suiteSelect = bookingForm.elements.namedItem("suiteType");
+const suiteOptionsEl = document.getElementById("suite-options");
 const addonOptionsEl = document.getElementById("addon-options");
 const catRowsEl = document.getElementById("cat-rows");
 const addCatBtn = document.getElementById("add-cat");
@@ -184,6 +184,7 @@ function normalizeSettings(raw) {
         name: String(suite.name || "").trim(),
         nightlyRate: Number(suite.nightlyRate) || 0,
         capacity: Math.max(1, Number(suite.capacity) || 1),
+        imageUrl: String(suite.imageUrl || "").trim(),
         active: suite.active !== false,
       }))
       .filter((suite) => suite.code && suite.name),
@@ -199,22 +200,75 @@ function normalizeSettings(raw) {
   };
 }
 
+function renderSuiteCards(suiteOptions) {
+  suiteOptionsEl.innerHTML = "";
+
+  suiteOptions.forEach((suite, index) => {
+    const card = document.createElement("label");
+    card.className = "suite-card";
+
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "suiteType";
+    radio.value = suite.code;
+    radio.required = true;
+    if (index === 0) radio.checked = true;
+
+    const media = document.createElement("div");
+    media.className = "suite-card-media";
+    if (suite.imageUrl) {
+      const img = document.createElement("img");
+      img.src = suite.imageUrl;
+      img.alt = suite.name;
+      img.loading = "lazy";
+      img.addEventListener("error", () => {
+        media.classList.add("suite-card-media-placeholder");
+        img.remove();
+      });
+      media.appendChild(img);
+    } else {
+      media.classList.add("suite-card-media-placeholder");
+      media.textContent = "🐾";
+    }
+
+    const info = document.createElement("div");
+    info.className = "suite-card-info";
+    const nameEl = document.createElement("strong");
+    nameEl.textContent = suite.name;
+    const detailEl = document.createElement("span");
+    detailEl.textContent = `${formatMoney(suite.nightlyRate)} / night · up to ${suite.capacity} cat${suite.capacity === 1 ? "" : "s"}`;
+    info.append(nameEl, detailEl);
+
+    card.append(radio, media, info);
+    suiteOptionsEl.appendChild(card);
+  });
+
+  updateSuiteCardSelection();
+}
+
+function updateSuiteCardSelection() {
+  Array.from(suiteOptionsEl.querySelectorAll(".suite-card")).forEach((card) => {
+    const input = card.querySelector('input[type="radio"]');
+    card.classList.toggle("selected", Boolean(input?.checked));
+  });
+}
+
+bookingForm.addEventListener("change", (event) => {
+  if (event.target.name === "suiteType") updateSuiteCardSelection();
+});
+
 function renderSelectOptions() {
   const suiteOptions = settings.suites.filter((suite) => suite.active);
-  suiteSelect.innerHTML = "";
   availabilitySuite.innerHTML = "";
 
   suiteOptions.forEach((suite) => {
-    const optionA = document.createElement("option");
-    optionA.value = suite.code;
-    optionA.textContent = suite.name;
-    suiteSelect.appendChild(optionA);
-
     const optionB = document.createElement("option");
     optionB.value = suite.code;
     optionB.textContent = suite.name;
     availabilitySuite.appendChild(optionB);
   });
+
+  renderSuiteCards(suiteOptions);
 
   const addonOptions = settings.addons.filter((addon) => addon.active && addon.code !== "none");
   addonOptionsEl.innerHTML = "";
