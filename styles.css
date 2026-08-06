@@ -491,23 +491,6 @@ button.secondary {
   color: #b24826;
 }
 
-.blocked-ranges {
-  margin: 0.5rem 0 1rem;
-  color: var(--brand-muted);
-  font-size: 0.93rem;
-}
-
-.blocked-ranges ul {
-  margin: 0.35rem 0 0;
-  padding-left: 1rem;
-}
-
-.price-guide {
-  margin: 0.35rem 0 0;
-  padding-left: 1.1rem;
-  color: var(--brand-muted);
-}
-
 .calendar-toolbar {
   margin-top: 0.8rem;
   display: flex;
