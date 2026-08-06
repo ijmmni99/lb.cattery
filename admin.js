@@ -511,7 +511,6 @@ async function init() {
   const restored = await restoreSession();
   if (!restored) {
     setLoginCardVisible(true);
-    showStatus("Please sign in with administrator account.", false);
   }
 }
 
