@@ -504,13 +504,26 @@ saveBookingBtn.addEventListener("click", saveSettings);
 saveSuitesBtn.addEventListener("click", saveSettings);
 saveAddonsBtn.addEventListener("click", saveSettings);
 
-async function init() {
-  setWorkspaceVisible(false);
-  setActivePanel("panel-upcoming");
+function hidePageLoading() {
+  const el = document.getElementById("page-loading");
+  if (!el) return;
+  el.classList.add("fade-out");
+  setTimeout(() => {
+    el.hidden = true;
+  }, 220);
+}
 
-  const restored = await restoreSession();
-  if (!restored) {
-    setLoginCardVisible(true);
+async function init() {
+  try {
+    setWorkspaceVisible(false);
+    setActivePanel("panel-upcoming");
+
+    const restored = await restoreSession();
+    if (!restored) {
+      setLoginCardVisible(true);
+    }
+  } finally {
+    hidePageLoading();
   }
 }
 

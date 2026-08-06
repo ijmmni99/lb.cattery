@@ -325,27 +325,40 @@ logoutBtn.addEventListener("click", () => {
   setAuthStatus("You are signed out.", false);
 });
 
+function hidePageLoading() {
+  const el = document.getElementById("page-loading");
+  if (!el) return;
+  el.classList.add("fade-out");
+  setTimeout(() => {
+    el.hidden = true;
+  }, 220);
+}
+
 async function init() {
-  const resetToken = new URLSearchParams(window.location.search).get("reset");
-  if (resetToken) {
-    activeResetToken = resetToken;
-    setMode("reset");
-    return;
-  }
+  try {
+    const resetToken = new URLSearchParams(window.location.search).get("reset");
+    if (resetToken) {
+      activeResetToken = resetToken;
+      setMode("reset");
+      return;
+    }
 
-  setMode("login");
-  const valid = await verifySession();
-  if (!valid) {
-    clearSession();
-    showLoggedOutUi();
-    return;
-  }
+    setMode("login");
+    const valid = await verifySession();
+    if (!valid) {
+      clearSession();
+      showLoggedOutUi();
+      return;
+    }
 
-  const name = localStorage.getItem("lb_user_name") || "";
-  const email = localStorage.getItem("lb_user_email") || "";
-  showAuthenticatedUi(name, email);
-  setAuthStatus("Signed in with existing session.", true);
-  await loadMyBookings();
+    const name = localStorage.getItem("lb_user_name") || "";
+    const email = localStorage.getItem("lb_user_email") || "";
+    showAuthenticatedUi(name, email);
+    setAuthStatus("Signed in with existing session.", true);
+    await loadMyBookings();
+  } finally {
+    hidePageLoading();
+  }
 }
 
 init();
