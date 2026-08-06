@@ -704,14 +704,27 @@ calNextBtn.addEventListener("click", async () => {
   await renderAvailabilityCalendar();
 });
 
+function hidePageLoading() {
+  const el = document.getElementById("page-loading");
+  if (!el) return;
+  el.classList.add("fade-out");
+  setTimeout(() => {
+    el.hidden = true;
+  }, 220);
+}
+
 async function init() {
-  settings = await getSettings();
-  renderSelectOptions();
-  resetCatRows();
-  applyBookingStatus();
-  refreshEstimate();
-  showStep(0);
-  await renderAvailabilityCalendar();
+  try {
+    settings = await getSettings();
+    renderSelectOptions();
+    resetCatRows();
+    applyBookingStatus();
+    refreshEstimate();
+    showStep(0);
+    await renderAvailabilityCalendar();
+  } finally {
+    hidePageLoading();
+  }
 }
 
 init();

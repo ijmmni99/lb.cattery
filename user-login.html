@@ -13,16 +13,23 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="admin-page user-page">
+    <div id="page-loading" class="page-loading" aria-live="polite" aria-busy="true">
+      <div class="page-loading-spinner" aria-hidden="true"></div>
+      <p>Loading account...</p>
+    </div>
+
     <header class="site-header">
-      <div class="header-auth">
-        <a href="index.html" class="back-link">← Back to Booking Page</a>
-      </div>
-      <div class="brand-wrap">
-        <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
-        <div>
-          <p class="eyebrow">Customer Portal</p>
-          <h1>User Login</h1>
-          <p class="brand-tagline">Sign in to manage your reservations.</p>
+      <div class="header-top">
+        <div class="brand-wrap">
+          <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
+          <div>
+            <p class="eyebrow">Customer Portal</p>
+            <h1>User Login</h1>
+            <p class="brand-tagline">Sign in to manage your reservations.</p>
+          </div>
+        </div>
+        <div class="header-auth">
+          <a href="index.html" class="back-link">← Back to Booking Page</a>
         </div>
       </div>
     </header>

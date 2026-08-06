@@ -13,16 +13,23 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="admin-page">
+    <div id="page-loading" class="page-loading" aria-live="polite" aria-busy="true">
+      <div class="page-loading-spinner" aria-hidden="true"></div>
+      <p>Loading admin backend...</p>
+    </div>
+
     <header class="site-header">
-      <div class="header-auth">
-        <a href="index.html" class="back-link">← Back to Booking Page</a>
-      </div>
-      <div class="brand-wrap">
-        <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
-        <div>
-          <p class="eyebrow">Administrator</p>
-          <h1>L&B Cattery Backend</h1>
-          <p class="brand-tagline">Manage settings used by the public website.</p>
+      <div class="header-top">
+        <div class="brand-wrap">
+          <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
+          <div>
+            <p class="eyebrow">Administrator</p>
+            <h1>L&B Cattery Backend</h1>
+            <p class="brand-tagline">Manage settings used by the public website.</p>
+          </div>
+        </div>
+        <div class="header-auth">
+          <a href="index.html" class="back-link">← Back to Booking Page</a>
         </div>
       </div>
     </header>
