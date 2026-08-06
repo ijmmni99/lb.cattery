@@ -23,7 +23,6 @@ const availabilityEnd = document.getElementById("availability-end");
 const availabilitySuite = document.getElementById("availability-suite");
 const availabilityResult = document.getElementById("availability-result");
 const checkAvailabilityBtn = document.getElementById("check-availability");
-const blockedRangesEl = document.getElementById("blocked-ranges");
 const calendarTitleEl = document.getElementById("calendar-title");
 const calendarEl = document.getElementById("availability-calendar");
 const calPrevBtn = document.getElementById("cal-prev");
@@ -33,7 +32,6 @@ const suiteOptionsEl = document.getElementById("suite-options");
 const addonOptionsEl = document.getElementById("addon-options");
 const catRowsEl = document.getElementById("cat-rows");
 const addCatBtn = document.getElementById("add-cat");
-const priceGuideEl = document.getElementById("price-guide");
 const accountMenuBtn = document.getElementById("account-menu-btn");
 const accountMenu = document.getElementById("account-menu");
 const stepIndicatorEl = document.getElementById("step-indicator");
@@ -279,7 +277,9 @@ function renderSelectOptions() {
     checkbox.type = "checkbox";
     checkbox.name = "addOn";
     checkbox.value = addon.code;
-    label.append(checkbox, document.createTextNode(addon.name));
+    const textEl = document.createElement("span");
+    textEl.textContent = `${addon.name} (${formatAddonFee(addon)})`;
+    label.append(checkbox, textEl);
     addonOptionsEl.appendChild(label);
   });
 }
@@ -355,26 +355,19 @@ function collectAddOns() {
 
 addCatBtn.addEventListener("click", addCatRow);
 
-function renderPriceGuide() {
-  const suiteItems = settings.suites
-    .filter((suite) => suite.active)
-    .map((suite) => `<li>${suite.name}: ${formatMoney(suite.nightlyRate)} per night (Capacity: ${suite.capacity})</li>`);
-  const addonItems = settings.addons
-    .filter((addon) => addon.active)
-    .map((addon) => {
-      if ((addon.flatFee || 0) > 0 && (addon.nightlyFee || 0) > 0) {
-        return `<li>${addon.name}: +${formatMoney(addon.flatFee)} booking fee and +${formatMoney(addon.nightlyFee)} per night</li>`;
-      }
-      if ((addon.flatFee || 0) > 0) {
-        return `<li>${addon.name}: +${formatMoney(addon.flatFee)} booking fee</li>`;
-      }
-      if ((addon.nightlyFee || 0) > 0) {
-        return `<li>${addon.name}: +${formatMoney(addon.nightlyFee)} per night</li>`;
-      }
-      return `<li>${addon.name}: no extra fee</li>`;
-    });
-
-  priceGuideEl.innerHTML = [...suiteItems, ...addonItems].join("");
+function formatAddonFee(addon) {
+  const flatFee = addon.flatFee || 0;
+  const nightlyFee = addon.nightlyFee || 0;
+  if (flatFee > 0 && nightlyFee > 0) {
+    return `+${formatMoney(flatFee)} booking fee + ${formatMoney(nightlyFee)}/night`;
+  }
+  if (flatFee > 0) {
+    return `+${formatMoney(flatFee)} booking fee`;
+  }
+  if (nightlyFee > 0) {
+    return `+${formatMoney(nightlyFee)}/night`;
+  }
+  return "no extra fee";
 }
 
 function datesOverlap(aStart, aEnd, bStart, bEnd) {
@@ -493,30 +486,6 @@ function showAvailabilityMessage(message, ok) {
   availabilityResult.textContent = message;
   availabilityResult.classList.remove("ok", "warn");
   availabilityResult.classList.add(ok ? "ok" : "warn");
-}
-
-async function renderBlockedRanges(suiteType) {
-  const bookings = (await getBookings())
-    .filter((booking) => booking.suiteType === suiteType)
-    .sort((a, b) => parseDate(a.checkIn) - parseDate(b.checkIn));
-
-  blockedRangesEl.innerHTML = "";
-  const heading = document.createElement("strong");
-  heading.textContent = "Booked date blocks:";
-  blockedRangesEl.appendChild(heading);
-
-  if (!bookings.length) {
-    blockedRangesEl.append(" none yet for this suite.");
-    return;
-  }
-
-  const list = document.createElement("ul");
-  bookings.slice(0, 6).forEach((booking) => {
-    const li = document.createElement("li");
-    li.textContent = `${booking.checkIn} to ${booking.checkOut}`;
-    list.appendChild(li);
-  });
-  blockedRangesEl.appendChild(list);
 }
 
 function applyBookingStatus() {
@@ -672,7 +641,6 @@ bookingForm.addEventListener("submit", async (event) => {
   resetCatRows();
   refreshEstimate();
   showStep(0);
-  await renderBlockedRanges(availabilitySuite.value);
   await renderAvailabilityCalendar();
   showAvailabilityMessage(
     `Reservation confirmed. Booking ID: ${booking.id} — a confirmation was emailed to ${booking.ownerEmail}. Keep the ID to look up this booking later.`,
@@ -711,12 +679,10 @@ checkAvailabilityBtn.addEventListener("click", async () => {
     showAvailabilityMessage("That period is fully booked. Try another date range.", false);
   }
 
-  await renderBlockedRanges(suiteType);
   await renderAvailabilityCalendar();
 });
 
 availabilitySuite.addEventListener("change", async () => {
-  await renderBlockedRanges(availabilitySuite.value);
   await renderAvailabilityCalendar();
 });
 
@@ -742,11 +708,9 @@ async function init() {
   settings = await getSettings();
   renderSelectOptions();
   resetCatRows();
-  renderPriceGuide();
   applyBookingStatus();
   refreshEstimate();
   showStep(0);
-  await renderBlockedRanges(availabilitySuite.value);
   await renderAvailabilityCalendar();
 }
 
