@@ -643,7 +643,7 @@ bookingForm.addEventListener("submit", async (event) => {
   showStep(0);
   await renderAvailabilityCalendar();
   showAvailabilityMessage(
-    `Reservation confirmed. Booking ID: ${booking.id} — a confirmation was emailed to ${booking.ownerEmail}. Keep the ID to look up this booking later.`,
+    `Booking submitted. Booking ID: ${booking.id} — we'll review it and email ${booking.ownerEmail} once it's confirmed. Keep the ID to look up this booking later.`,
     true,
   );
 });

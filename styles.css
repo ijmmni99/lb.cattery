@@ -808,6 +808,35 @@ th {
   background: #fff3cf;
 }
 
+.status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-pill-pending {
+  background: #fff3cf;
+  color: #8a6a1f;
+}
+
+.status-pill-confirmed {
+  background: #e3edff;
+  color: #2a4d8f;
+}
+
+.status-pill-completed {
+  background: #eaf7ec;
+  color: #2f6d3c;
+}
+
+.status-pill-rejected {
+  background: #fff1ed;
+  color: #a4482f;
+}
+
 #upcoming-bookings-rows td {
   padding-top: 0.8rem;
   padding-bottom: 0.8rem;

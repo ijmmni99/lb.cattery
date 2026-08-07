@@ -38,6 +38,21 @@ function addOnsLabel(booking) {
   return addOns.length ? addOns.join(", ") : "None";
 }
 
+const STATUS_LABELS = {
+  pending: "Pending Review",
+  confirmed: "Confirmed",
+  rejected: "Not Approved",
+  completed: "Completed",
+};
+
+function statusBadge(status) {
+  const key = status || "pending";
+  const badge = document.createElement("span");
+  badge.className = `status-pill status-pill-${key}`;
+  badge.textContent = STATUS_LABELS[key] || key;
+  return badge;
+}
+
 function renderBooking(booking) {
   const rows = [
     ["Booking ID", booking.id],
@@ -51,6 +66,13 @@ function renderBooking(booking) {
   if (booking.notes) rows.push(["Notes", booking.notes]);
 
   summaryEl.innerHTML = "";
+
+  const statusDt = document.createElement("dt");
+  statusDt.textContent = "Status";
+  const statusDd = document.createElement("dd");
+  statusDd.appendChild(statusBadge(booking.status));
+  summaryEl.append(statusDt, statusDd);
+
   rows.forEach(([label, value]) => {
     const dt = document.createElement("dt");
     dt.textContent = label;
