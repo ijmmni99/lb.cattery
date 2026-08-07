@@ -122,7 +122,22 @@ async function verifySession() {
   return true;
 }
 
-const BOOKING_ROW_LABELS = ["Booking ID", "Cats", "Dates", "Suite", "Add-ons", "Total (MYR)", "Notes"];
+const BOOKING_ROW_LABELS = ["Booking ID", "Status", "Cats", "Dates", "Suite", "Add-ons", "Total (MYR)", "Notes"];
+
+const STATUS_LABELS = {
+  pending: "Pending Review",
+  confirmed: "Confirmed",
+  rejected: "Not Approved",
+  completed: "Completed",
+};
+
+function statusBadge(status) {
+  const key = status || "pending";
+  const badge = document.createElement("span");
+  badge.className = `status-pill status-pill-${key}`;
+  badge.textContent = STATUS_LABELS[key] || key;
+  return badge;
+}
 
 function catsLabel(row) {
   const cats = Array.isArray(row.cats) && row.cats.length
@@ -149,7 +164,7 @@ function renderBookings(rows) {
   if (!rows.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 7;
+    td.colSpan = BOOKING_ROW_LABELS.length;
     td.textContent = "No bookings found for your account email yet.";
     tr.appendChild(td);
     bookingsList.appendChild(tr);
@@ -160,6 +175,7 @@ function renderBookings(rows) {
     const dateLabel = `${row.check_in} to ${row.check_out}`;
     const values = [
       row.id,
+      statusBadge(row.status),
       catsLabel(row),
       dateLabel,
       row.suite_type || "-",
@@ -172,7 +188,11 @@ function renderBookings(rows) {
     values.forEach((value, index) => {
       const td = document.createElement("td");
       td.dataset.label = BOOKING_ROW_LABELS[index];
-      td.textContent = value;
+      if (value instanceof Node) {
+        td.appendChild(value);
+      } else {
+        td.textContent = value;
+      }
       tr.appendChild(td);
     });
     bookingsList.appendChild(tr);

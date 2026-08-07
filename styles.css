@@ -718,6 +718,12 @@ th {
   grid-template-columns: 260px 1fr;
   gap: 1rem;
   align-items: start;
+  min-width: 0;
+}
+
+.admin-main-panels,
+.admin-panel {
+  min-width: 0;
 }
 
 .admin-sidebar-card {
@@ -776,17 +782,64 @@ th {
 
 .booking-actions {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.35rem;
   flex-wrap: wrap;
+}
+
+.booking-actions .action-btn {
+  min-height: 30px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  font-weight: 600;
 }
 
 .action-btn.approve {
   background: #eaf7ec;
   border-color: #a9d9b2;
+  color: #2f6d3c;
+}
+
+.action-btn.delete {
+  color: #a4482f;
 }
 
 .booking-row-ready {
   background: #fff3cf;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-pill-pending {
+  background: #fff3cf;
+  color: #8a6a1f;
+}
+
+.status-pill-confirmed {
+  background: #e3edff;
+  color: #2a4d8f;
+}
+
+.status-pill-completed {
+  background: #eaf7ec;
+  color: #2f6d3c;
+}
+
+.status-pill-rejected {
+  background: #fff1ed;
+  color: #a4482f;
+}
+
+#upcoming-bookings-rows td {
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
 }
 
 .admin-main-panels {
@@ -1006,6 +1059,17 @@ th {
     flex-direction: column;
     align-items: stretch;
   }
+
+  .booking-subtabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .booking-subtab-btn {
+    width: 100%;
+    text-align: center;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1171,6 +1235,15 @@ th {
 
   .admin-page td::before {
     margin-bottom: 0.18rem;
+  }
+
+  .booking-actions {
+    flex-direction: column;
+  }
+
+  .booking-actions .action-btn {
+    width: 100%;
+    min-height: 38px;
   }
 
   .admin-page td input[type="checkbox"] {

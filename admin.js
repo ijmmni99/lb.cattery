@@ -294,11 +294,7 @@ function createBookingActions(row) {
     wrap.appendChild(createBookingActionButton("Approve", "approve", () => patchBookingStatus(row.id, "confirmed")));
     wrap.appendChild(createBookingActionButton("Reject", "delete", () => patchBookingStatus(row.id, "rejected")));
   } else if (row.status === "confirmed") {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (row.check_out && parseDate(row.check_out) <= today) {
-      wrap.appendChild(createBookingActionButton("Mark Completed", "approve", () => patchBookingStatus(row.id, "completed")));
-    }
+    wrap.appendChild(createBookingActionButton("Mark Completed", "approve", () => patchBookingStatus(row.id, "completed")));
   }
 
   return wrap;
