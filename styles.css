@@ -746,6 +746,49 @@ th {
   border-color: transparent;
 }
 
+.booking-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.booking-subtab-btn {
+  background: #fff7e4;
+  color: var(--brand-ink);
+  border: 1px solid var(--brand-border);
+  min-height: 38px;
+  padding: 0.45rem 0.85rem;
+  width: auto;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.booking-subtab-btn.active {
+  background: var(--brand-primary);
+  color: #fff;
+  border-color: transparent;
+}
+
+.status-count {
+  font-weight: 700;
+}
+
+.booking-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.action-btn.approve {
+  background: #eaf7ec;
+  border-color: #a9d9b2;
+}
+
+.booking-row-ready {
+  background: #fff3cf;
+}
+
 .admin-main-panels {
   display: grid;
   gap: 1rem;

@@ -86,11 +86,17 @@
 
           <div class="admin-main-panels">
             <section id="panel-upcoming" class="card admin-panel">
-              <h2>Upcoming Booking Information</h2>
-              <p class="form-mode">Latest reservation details for upcoming check-ins.</p>
+              <h2>Bookings</h2>
+              <p class="form-mode">Review new bookings, manage confirmed stays, and track completed reservations.</p>
               <div class="actions-row">
                 <button id="refresh-upcoming" type="button" class="secondary">Refresh Bookings</button>
               </div>
+              <nav id="booking-subtabs" class="booking-subtabs">
+                <button type="button" class="booking-subtab-btn active" data-status="pending">Pending Review <span id="count-pending" class="status-count"></span></button>
+                <button type="button" class="booking-subtab-btn" data-status="confirmed">Confirmed</button>
+                <button type="button" class="booking-subtab-btn" data-status="completed">Completed</button>
+                <button type="button" class="booking-subtab-btn" data-status="rejected">Rejected</button>
+              </nav>
               <div class="table-wrap">
                 <table>
                   <thead>
@@ -103,6 +109,7 @@
                       <th>Add-ons</th>
                       <th>Total (MYR)</th>
                       <th>Notes</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody id="upcoming-bookings-rows"></tbody>

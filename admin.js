@@ -27,6 +27,11 @@ const workspaceStatusEl = document.getElementById("admin-workspace-status");
 const upcomingRowsEl = document.getElementById("upcoming-bookings-rows");
 const upcomingStatusEl = document.getElementById("upcoming-status");
 const refreshUpcomingBtn = document.getElementById("refresh-upcoming");
+const bookingSubtabsEl = document.getElementById("booking-subtabs");
+const pendingCountEl = document.getElementById("count-pending");
+
+let allBookings = [];
+let activeBookingStatus = "pending";
 const navEl = document.getElementById("admin-nav");
 const navButtons = Array.from(document.querySelectorAll(".admin-nav-btn"));
 const panels = Array.from(document.querySelectorAll(".admin-panel"));
@@ -272,18 +277,48 @@ function addOnsLabel(row) {
   return addOns.length ? addOns.join(", ") : "-";
 }
 
-function renderUpcomingBookings(rows) {
+function createBookingActionButton(label, className, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `action-btn ${className}`;
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function createBookingActions(row) {
+  const wrap = document.createElement("div");
+  wrap.className = "booking-actions";
+
+  if (row.status === "pending") {
+    wrap.appendChild(createBookingActionButton("Approve", "approve", () => patchBookingStatus(row.id, "confirmed")));
+    wrap.appendChild(createBookingActionButton("Reject", "delete", () => patchBookingStatus(row.id, "rejected")));
+  } else if (row.status === "confirmed") {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (row.check_out && parseDate(row.check_out) <= today) {
+      wrap.appendChild(createBookingActionButton("Mark Completed", "approve", () => patchBookingStatus(row.id, "completed")));
+    }
+  }
+
+  return wrap;
+}
+
+function renderBookingsTable(rows) {
   upcomingRowsEl.innerHTML = "";
 
   if (!rows.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 8;
-    td.textContent = "No upcoming bookings found.";
+    td.colSpan = 9;
+    td.textContent = "No bookings found in this category.";
     tr.appendChild(td);
     upcomingRowsEl.appendChild(tr);
     return;
   }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   rows.forEach((row) => {
     const ownerLabel = `${row.owner_name || "-"} (${row.owner_phone || "-"})`;
@@ -299,25 +334,69 @@ function renderUpcomingBookings(rows) {
         document.createTextNode(addOnsLabel(row)),
         document.createTextNode(formatMoney(row.total_price)),
         document.createTextNode(row.notes || "-"),
+        createBookingActions(row),
       ],
-      ["Booking ID", "Owner", "Cats", "Stay Dates", "Suite", "Add-ons", "Total (MYR)", "Notes"],
+      ["Booking ID", "Owner", "Cats", "Stay Dates", "Suite", "Add-ons", "Total (MYR)", "Notes", "Actions"],
     );
+
+    if (row.status === "confirmed" && row.check_out && parseDate(row.check_out) <= today) {
+      tr.classList.add("booking-row-ready");
+    }
 
     upcomingRowsEl.appendChild(tr);
   });
 }
 
-async function loadUpcomingBookings() {
-  const rows = await fetchBookings();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+function setActiveBookingSubtab(status) {
+  activeBookingStatus = status;
+  if (bookingSubtabsEl) {
+    Array.from(bookingSubtabsEl.querySelectorAll(".booking-subtab-btn")).forEach((button) => {
+      button.classList.toggle("active", button.dataset.status === status);
+    });
+  }
+  renderActiveBookingTab();
+}
 
-  const upcoming = rows
-    .filter((row) => row.check_out && parseDate(row.check_out) >= today)
+function renderActiveBookingTab() {
+  const rows = allBookings
+    .filter((row) => (row.status || "pending") === activeBookingStatus)
     .sort((a, b) => parseDate(a.check_in || "2100-01-01") - parseDate(b.check_in || "2100-01-01"));
 
-  renderUpcomingBookings(upcoming);
-  showUpcomingStatus(`Showing ${upcoming.length} upcoming booking(s).`, true);
+  renderBookingsTable(rows);
+  showUpcomingStatus(`Showing ${rows.length} ${activeBookingStatus} booking(s).`, true);
+}
+
+async function loadUpcomingBookings() {
+  allBookings = await fetchBookings();
+
+  if (pendingCountEl) {
+    const pendingCount = allBookings.filter((row) => (row.status || "pending") === "pending").length;
+    pendingCountEl.textContent = pendingCount ? `(${pendingCount})` : "";
+  }
+
+  renderActiveBookingTab();
+}
+
+async function patchBookingStatus(id, status) {
+  showUpcomingStatus("Updating booking...", true);
+  try {
+    const res = await fetch(`/api/bookings?id=${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify({ status }),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => null);
+      showUpcomingStatus(errorBody?.error || "Failed to update booking.", false);
+      return;
+    }
+
+    showUpcomingStatus(`Booking ${id} updated to ${status}.`, true);
+    await loadUpcomingBookings();
+  } catch (err) {
+    showUpcomingStatus("Failed to update booking.", false);
+  }
 }
 
 async function enterWorkspace() {
@@ -464,6 +543,14 @@ if (navEl) {
 }
 
 refreshUpcomingBtn.addEventListener("click", loadUpcomingBookings);
+
+if (bookingSubtabsEl) {
+  bookingSubtabsEl.addEventListener("click", (event) => {
+    const target = event.target.closest(".booking-subtab-btn");
+    if (!target) return;
+    setActiveBookingSubtab(target.dataset.status);
+  });
+}
 
 addSuiteBtn.addEventListener("click", () => {
   const imageUrlInput = createCellInput("");
