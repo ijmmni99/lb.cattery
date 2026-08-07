@@ -39,7 +39,7 @@ export async function onRequest({ request, env }) {
   };
 
   const res = await fetch(
-    `${base}?id=eq.${encodeURIComponent(bookingId)}&owner_email=eq.${encodeURIComponent(email)}&select=id,owner_name,owner_email,owner_phone,cats,cat_name,breed,age,suite_type,check_in,check_out,add_ons,add_on,total_price,notes&limit=1`,
+    `${base}?id=eq.${encodeURIComponent(bookingId)}&owner_email=eq.${encodeURIComponent(email)}&select=id,owner_name,owner_email,owner_phone,cats,cat_name,breed,age,suite_type,check_in,check_out,add_ons,add_on,total_price,notes,status&limit=1`,
     { headers: auth },
   );
 
