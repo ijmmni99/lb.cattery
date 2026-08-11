@@ -517,7 +517,6 @@ function closeCalendarPopover() {
 }
 
 function positionCalendarPopover(anchorEl) {
-  if (mobileLayoutQuery.matches) return;
   const rect = anchorEl.getBoundingClientRect();
   const popRect = calendarPopover.getBoundingClientRect();
   let left = rect.left + rect.width / 2 - popRect.width / 2;

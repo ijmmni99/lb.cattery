@@ -1346,14 +1346,6 @@ th {
     padding: 0.04rem 0.22rem;
   }
 
-  .calendar-popover {
-    left: 0.6rem !important;
-    right: 0.6rem !important;
-    top: auto !important;
-    bottom: 0.6rem !important;
-    width: auto;
-    max-width: none;
-  }
 
   table,
   thead,
