@@ -637,6 +637,177 @@ button.secondary {
   background: #fff0eb;
 }
 
+.calendar-day:not(.empty) {
+  cursor: pointer;
+}
+
+.calendar-day:not(.empty):hover {
+  border-color: var(--brand-primary-dark);
+}
+
+.calendar-day:not(.empty):focus-visible {
+  outline: 2px solid var(--brand-primary-dark);
+  outline-offset: 2px;
+}
+
+.calendar-day.day-active {
+  border-color: var(--brand-primary-dark);
+  box-shadow: 0 0 0 2px rgba(215, 156, 53, 0.35);
+}
+
+.calendar-popover {
+  position: fixed;
+  z-index: 40;
+  width: 240px;
+  max-width: calc(100vw - 1.2rem);
+  background: var(--brand-paper);
+  border: 1px solid var(--brand-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-soft);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.82rem;
+  color: var(--brand-ink);
+  animation: reveal 160ms ease-out;
+}
+
+.calendar-popover[hidden] {
+  display: none;
+}
+
+.calendar-popover h4 {
+  margin: 0 0.6rem 0.4rem 0;
+  font-size: 0.88rem;
+}
+
+.calendar-popover .popover-total {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+  color: var(--brand-muted);
+}
+
+.calendar-popover .popover-empty {
+  margin: 0;
+  color: var(--brand-muted);
+}
+
+.calendar-popover ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+}
+
+.calendar-popover li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px dashed var(--brand-border);
+}
+
+.calendar-popover li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.calendar-popover .popover-close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.5rem;
+  border: none;
+  background: none;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--brand-muted);
+  padding: 0.15rem 0.35rem;
+}
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  align-items: start;
+  margin-top: 0.6rem;
+}
+
+.contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.contact-item {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.contact-item p {
+  margin: 0;
+}
+
+.contact-icon {
+  font-size: 1.15rem;
+  line-height: 1.4;
+}
+
+.contact-label {
+  font-weight: 700;
+  color: var(--brand-ink);
+  margin-bottom: 0.15rem !important;
+}
+
+.contact-item a {
+  color: var(--brand-primary-dark);
+  font-weight: 600;
+}
+
+.hours-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.hours-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 260px;
+}
+
+.hours-list dt {
+  color: var(--brand-muted);
+  font-weight: 600;
+}
+
+.hours-list dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.contact-map {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.contact-map iframe {
+  width: 100%;
+  height: 260px;
+  border: 1px solid var(--brand-border);
+  border-radius: 14px;
+}
+
+.map-link {
+  align-self: flex-start;
+  font-weight: 600;
+  color: var(--brand-primary-dark);
+}
+
 .table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -984,6 +1155,10 @@ th {
     grid-column: auto;
   }
 
+  .contact-grid {
+    grid-template-columns: 1fr;
+  }
+
   .grid.two {
     grid-template-columns: 1fr;
   }
@@ -1160,6 +1335,15 @@ th {
     font-size: 0.63rem;
     min-width: 16px;
     padding: 0.04rem 0.22rem;
+  }
+
+  .calendar-popover {
+    left: 0.6rem !important;
+    right: 0.6rem !important;
+    top: auto !important;
+    bottom: 0.6rem !important;
+    width: auto;
+    max-width: none;
   }
 
   table,

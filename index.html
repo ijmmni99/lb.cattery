@@ -73,6 +73,7 @@
           <button id="cal-next" type="button" class="secondary">Next</button>
         </div>
         <div id="availability-calendar" class="availability-calendar" aria-live="polite"></div>
+        <div id="calendar-popover" class="calendar-popover" hidden role="dialog" aria-label="Booking summary"></div>
       </section>
 
       <section class="card" id="booking-card">
@@ -144,6 +145,58 @@
             </div>
           </div>
         </form>
+      </section>
+
+      <section class="card wide" id="contact-card">
+        <h2>Visit &amp; Contact Us</h2>
+        <div class="contact-grid">
+          <div class="contact-details">
+            <div class="contact-item">
+              <span class="contact-icon" aria-hidden="true">📍</span>
+              <div>
+                <p class="contact-label">Address</p>
+                <p>Amberside, Country Garden, Persiaran Danga Perdana, 80200 Johor Bahru, Johor Darul Ta'zim, Malaysia</p>
+              </div>
+            </div>
+            <div class="contact-item">
+              <span class="contact-icon" aria-hidden="true">✉️</span>
+              <div>
+                <p class="contact-label">Email</p>
+                <p><a href="mailto:lbcatteryofficial@gmail.com">lbcatteryofficial@gmail.com</a></p>
+              </div>
+            </div>
+            <div class="contact-item">
+              <span class="contact-icon" aria-hidden="true">🕒</span>
+              <div>
+                <p class="contact-label">Opening Hours</p>
+                <dl class="hours-list">
+                  <div><dt>Monday</dt><dd>8pm – 10pm</dd></div>
+                  <div><dt>Tuesday</dt><dd>8pm – 10pm</dd></div>
+                  <div><dt>Wednesday</dt><dd>8pm – 10pm</dd></div>
+                  <div><dt>Thursday</dt><dd>8pm – 10pm</dd></div>
+                  <div><dt>Friday</dt><dd>8pm – 10pm</dd></div>
+                  <div><dt>Saturday</dt><dd>9am – 10pm</dd></div>
+                  <div><dt>Sunday</dt><dd>9am – 10pm</dd></div>
+                </dl>
+              </div>
+            </div>
+          </div>
+          <div class="contact-map">
+            <iframe
+              title="L&B Cattery location map"
+              src="https://www.google.com/maps?q=Amberside,+Country+Garden,+Persiaran+Danga+Perdana,+80200+Johor+Bahru,+Johor&amp;z=17&amp;output=embed"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+            ></iframe>
+            <a
+              class="map-link"
+              href="https://maps.app.goo.gl/oH7C8QgKL2M1Fm959"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Open in Google Maps</a
+            >
+          </div>
+        </div>
       </section>
     </main>
 

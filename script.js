@@ -25,6 +25,7 @@ const availabilityResult = document.getElementById("availability-result");
 const checkAvailabilityBtn = document.getElementById("check-availability");
 const calendarTitleEl = document.getElementById("calendar-title");
 const calendarEl = document.getElementById("availability-calendar");
+const calendarPopover = document.getElementById("calendar-popover");
 const calPrevBtn = document.getElementById("cal-prev");
 const calNextBtn = document.getElementById("cal-next");
 const formModeEl = document.getElementById("form-mode");
@@ -50,6 +51,9 @@ const calendarState = {
   year: new Date().getFullYear(),
   month: new Date().getMonth(),
 };
+
+let calendarBookingsCache = [];
+let activeCalendarDay = null;
 
 let settings = structuredClone(DEFAULT_SETTINGS);
 
@@ -434,6 +438,8 @@ async function renderAvailabilityCalendar() {
   const firstWeekday = start.getDay();
   const daysInMonth = end.getDate();
   const allBookings = await getBookings();
+  calendarBookingsCache = allBookings;
+  closeCalendarPopover();
 
   calendarTitleEl.textContent = new Intl.DateTimeFormat("en-MY", {
     month: "long",
@@ -461,6 +467,14 @@ async function renderAvailabilityCalendar() {
 
     const dayEl = document.createElement("div");
     dayEl.className = `calendar-day ${dayClassByCount(count, suiteType)}`;
+    dayEl.dataset.date = isoDate;
+    dayEl.tabIndex = 0;
+    dayEl.setAttribute("role", "button");
+    dayEl.setAttribute("aria-haspopup", "dialog");
+    dayEl.setAttribute(
+      "aria-label",
+      `${formatDateLong(isoDate)}: ${count > 0 ? `${count} booking${count > 1 ? "s" : ""}` : "no bookings"}. Tap for summary.`,
+    );
 
     const dayNum = document.createElement("strong");
     dayNum.textContent = String(day);
@@ -471,6 +485,138 @@ async function renderAvailabilityCalendar() {
     dayEl.append(dayNum, countLabel);
     calendarEl.appendChild(dayEl);
   }
+}
+
+function formatDateLong(dateIso) {
+  return new Intl.DateTimeFormat("en-MY", {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(parseDate(dateIso));
+}
+
+function bookingsSummaryForDate(dateIso, allBookings) {
+  const matches = allBookings.filter((booking) => dateIso >= booking.checkIn && dateIso < booking.checkOut);
+  const bySuite = new Map();
+  matches.forEach((booking) => {
+    const suite = suiteByCode(booking.suiteType);
+    const label = suite ? suite.name : booking.suiteType;
+    bySuite.set(label, (bySuite.get(label) || 0) + 1);
+  });
+  return { total: matches.length, bySuite };
+}
+
+function closeCalendarPopover() {
+  if (!calendarPopover) return;
+  calendarPopover.hidden = true;
+  calendarPopover.innerHTML = "";
+  if (activeCalendarDay) {
+    activeCalendarDay.classList.remove("day-active");
+    activeCalendarDay = null;
+  }
+}
+
+function positionCalendarPopover(anchorEl) {
+  if (mobileLayoutQuery.matches) return;
+  const rect = anchorEl.getBoundingClientRect();
+  const popRect = calendarPopover.getBoundingClientRect();
+  let left = rect.left + rect.width / 2 - popRect.width / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - popRect.width - 8));
+  let top = rect.bottom + 8;
+  if (top + popRect.height > window.innerHeight - 8) {
+    top = rect.top - popRect.height - 8;
+  }
+  calendarPopover.style.left = `${left}px`;
+  calendarPopover.style.top = `${top}px`;
+}
+
+function renderCalendarPopover(dateIso, anchorEl) {
+  const { total, bySuite } = bookingsSummaryForDate(dateIso, calendarBookingsCache);
+  calendarPopover.innerHTML = "";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "popover-close";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.textContent = "×";
+  closeBtn.addEventListener("click", closeCalendarPopover);
+
+  const heading = document.createElement("h4");
+  heading.textContent = formatDateLong(dateIso);
+
+  calendarPopover.append(closeBtn, heading);
+
+  if (total === 0) {
+    const empty = document.createElement("p");
+    empty.className = "popover-empty";
+    empty.textContent = "No bookings on this date.";
+    calendarPopover.appendChild(empty);
+  } else {
+    const summaryLine = document.createElement("p");
+    summaryLine.className = "popover-total";
+    summaryLine.textContent = `${total} booking${total > 1 ? "s" : ""} total`;
+
+    const list = document.createElement("ul");
+    bySuite.forEach((count, label) => {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.textContent = label;
+      const num = document.createElement("span");
+      num.textContent = `${count} booking${count > 1 ? "s" : ""}`;
+      li.append(name, num);
+      list.appendChild(li);
+    });
+
+    calendarPopover.append(summaryLine, list);
+  }
+
+  calendarPopover.hidden = false;
+  positionCalendarPopover(anchorEl);
+}
+
+function toggleCalendarPopover(dayEl) {
+  const dateIso = dayEl.dataset.date;
+  if (!dateIso) return;
+  if (activeCalendarDay === dayEl && !calendarPopover.hidden) {
+    closeCalendarPopover();
+    return;
+  }
+  if (activeCalendarDay) activeCalendarDay.classList.remove("day-active");
+  activeCalendarDay = dayEl;
+  dayEl.classList.add("day-active");
+  renderCalendarPopover(dateIso, dayEl);
+}
+
+if (calendarEl && calendarPopover) {
+  calendarEl.addEventListener("click", (event) => {
+    const dayEl = event.target.closest(".calendar-day:not(.empty)");
+    if (!dayEl) return;
+    toggleCalendarPopover(dayEl);
+  });
+
+  calendarEl.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const dayEl = event.target.closest(".calendar-day:not(.empty)");
+    if (!dayEl) return;
+    event.preventDefault();
+    toggleCalendarPopover(dayEl);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (calendarPopover.hidden) return;
+    const target = event.target;
+    if (calendarPopover.contains(target) || (activeCalendarDay && activeCalendarDay.contains(target))) return;
+    closeCalendarPopover();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !calendarPopover.hidden) closeCalendarPopover();
+  });
+
+  window.addEventListener("resize", () => {
+    if (!calendarPopover.hidden && activeCalendarDay) positionCalendarPopover(activeCalendarDay);
+  });
 }
 
 function refreshEstimate() {
