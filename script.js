@@ -759,6 +759,13 @@ new ResizeObserver(syncPricePanelSpacing).observe(pricePanelEl);
 mobileLayoutQuery.addEventListener("change", syncPricePanelSpacing);
 window.addEventListener("resize", syncPricePanelSpacing);
 
+if ("IntersectionObserver" in window) {
+  const bookingCardVisibility = new IntersectionObserver(([entry]) => {
+    pricePanelEl.classList.toggle("price-panel-offscreen", !entry.isIntersecting);
+  });
+  bookingCardVisibility.observe(document.getElementById("booking-card"));
+}
+
 bookingForm.addEventListener("input", refreshEstimate);
 
 bookingForm.addEventListener("submit", async (event) => {

@@ -1197,6 +1197,12 @@ th {
     border-bottom: none;
     box-shadow: 0 -10px 24px rgba(138, 90, 31, 0.18);
     padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    transition: transform 200ms ease;
+  }
+
+  #booking-card .price-panel.price-panel-offscreen {
+    transform: translateY(120%);
+    pointer-events: none;
   }
 
   #booking-card .price-panel .actions-row {
