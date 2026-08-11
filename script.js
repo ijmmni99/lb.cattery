@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
     { code: "playtime", name: "Extended Playtime", flatFee: 0, nightlyFee: 10, active: true },
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
   ],
+  promos: [],
 };
 
 const bookingForm = document.getElementById("booking-form");
@@ -23,6 +24,12 @@ const availabilityEnd = document.getElementById("availability-end");
 const availabilitySuite = document.getElementById("availability-suite");
 const availabilityResult = document.getElementById("availability-result");
 const checkAvailabilityBtn = document.getElementById("check-availability");
+const promoBannerEl = document.getElementById("promo-banner");
+const promoCarouselEl = document.getElementById("promo-carousel");
+const promoTrackEl = document.getElementById("promo-track");
+const promoDotsEl = document.getElementById("promo-dots");
+const promoPrevBtn = document.getElementById("promo-prev");
+const promoNextBtn = document.getElementById("promo-next");
 const calendarTitleEl = document.getElementById("calendar-title");
 const calendarEl = document.getElementById("availability-calendar");
 const calendarPopover = document.getElementById("calendar-popover");
@@ -54,6 +61,10 @@ const calendarState = {
 
 let calendarBookingsCache = [];
 let activeCalendarDay = null;
+
+let promoSlides = [];
+let promoIndex = 0;
+let promoTimer = null;
 
 let settings = structuredClone(DEFAULT_SETTINGS);
 
@@ -173,6 +184,7 @@ function normalizeSettings(raw) {
 
   const suites = Array.isArray(safe.suites) ? safe.suites : DEFAULT_SETTINGS.suites;
   const addons = Array.isArray(safe.addons) ? safe.addons : DEFAULT_SETTINGS.addons;
+  const promos = Array.isArray(safe.promos) ? safe.promos : DEFAULT_SETTINGS.promos;
 
   return {
     booking: {
@@ -199,8 +211,114 @@ function normalizeSettings(raw) {
         active: addon.active !== false,
       }))
       .filter((addon) => addon.code && addon.name),
+    promos: promos
+      .map((promo) => ({
+        imageUrl: String(promo.imageUrl || "").trim(),
+        caption: String(promo.caption || "").trim(),
+        linkUrl: String(promo.linkUrl || "").trim(),
+        active: promo.active !== false,
+      }))
+      .filter((promo) => promo.imageUrl && promo.active),
   };
 }
+
+function stopPromoAutoplay() {
+  if (promoTimer) {
+    clearInterval(promoTimer);
+    promoTimer = null;
+  }
+}
+
+function startPromoAutoplay() {
+  stopPromoAutoplay();
+  if (promoSlides.length < 2) return;
+  promoTimer = setInterval(() => goToPromo(promoIndex + 1), 5000);
+}
+
+function goToPromo(index) {
+  if (!promoSlides.length) return;
+  promoIndex = (index + promoSlides.length) % promoSlides.length;
+  promoTrackEl.style.transform = `translateX(-${promoIndex * 100}%)`;
+  Array.from(promoDotsEl.children).forEach((dot, i) => {
+    dot.classList.toggle("active", i === promoIndex);
+  });
+}
+
+function renderPromoBanner(promos) {
+  promoSlides = promos;
+  promoTrackEl.innerHTML = "";
+  promoDotsEl.innerHTML = "";
+  stopPromoAutoplay();
+
+  if (!promos.length) {
+    promoBannerEl.hidden = true;
+    return;
+  }
+
+  promoBannerEl.hidden = false;
+
+  promos.forEach((promo, index) => {
+    const slide = document.createElement("div");
+    slide.className = "promo-slide";
+
+    const img = document.createElement("img");
+    img.src = promo.imageUrl;
+    img.alt = promo.caption || "Promotion";
+    img.loading = "lazy";
+
+    if (promo.linkUrl) {
+      const link = document.createElement("a");
+      link.href = promo.linkUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.appendChild(img);
+      slide.appendChild(link);
+    } else {
+      slide.appendChild(img);
+    }
+
+    if (promo.caption) {
+      const caption = document.createElement("p");
+      caption.className = "promo-caption";
+      caption.textContent = promo.caption;
+      slide.appendChild(caption);
+    }
+
+    promoTrackEl.appendChild(slide);
+
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "promo-dot";
+    dot.setAttribute("aria-label", `Go to promo ${index + 1}`);
+    dot.addEventListener("click", () => {
+      goToPromo(index);
+      startPromoAutoplay();
+    });
+    promoDotsEl.appendChild(dot);
+  });
+
+  const showNav = promos.length > 1;
+  promoPrevBtn.hidden = !showNav;
+  promoNextBtn.hidden = !showNav;
+  promoDotsEl.hidden = !showNav;
+
+  goToPromo(0);
+  startPromoAutoplay();
+}
+
+promoPrevBtn.addEventListener("click", () => {
+  goToPromo(promoIndex - 1);
+  startPromoAutoplay();
+});
+
+promoNextBtn.addEventListener("click", () => {
+  goToPromo(promoIndex + 1);
+  startPromoAutoplay();
+});
+
+promoCarouselEl.addEventListener("mouseenter", stopPromoAutoplay);
+promoCarouselEl.addEventListener("mouseleave", startPromoAutoplay);
+promoCarouselEl.addEventListener("touchstart", stopPromoAutoplay, { passive: true });
 
 function renderSuiteCards(suiteOptions) {
   suiteOptionsEl.innerHTML = "";
@@ -711,7 +829,8 @@ function renderBookingSummary() {
 
 function syncPricePanelSpacing() {
   const layoutEl = document.querySelector("main.layout");
-  if (!mobileLayoutQuery.matches) {
+  const isFixed = getComputedStyle(pricePanelEl).position === "fixed";
+  if (!isFixed) {
     bookingForm.style.paddingBottom = "";
     if (layoutEl) layoutEl.style.paddingBottom = "";
     return;
@@ -864,6 +983,7 @@ async function init() {
   try {
     settings = await getSettings();
     renderSelectOptions();
+    renderPromoBanner(settings.promos);
     resetCatRows();
     applyBookingStatus();
     refreshEstimate();

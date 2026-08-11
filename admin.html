@@ -80,6 +80,7 @@
               <button type="button" class="admin-nav-btn" data-target="panel-booking">Booking Rules</button>
               <button type="button" class="admin-nav-btn" data-target="panel-suites">Suites</button>
               <button type="button" class="admin-nav-btn" data-target="panel-addons">Add-ons</button>
+              <button type="button" class="admin-nav-btn" data-target="panel-promos">Promo Banner</button>
               <button type="button" class="admin-nav-btn" data-target="panel-save">Save Changes</button>
             </nav>
           </aside>
@@ -187,6 +188,30 @@
               <div class="actions-row">
                 <button id="add-addon" type="button" class="secondary">Add Add-on</button>
                 <button id="save-addons" type="button">Save Add-ons Configuration</button>
+              </div>
+            </section>
+
+            <section id="panel-promos" class="card admin-panel" hidden>
+              <h2>Promo Banner Configuration</h2>
+              <p class="form-mode">Images shown in the auto-scrolling banner at the top of the booking page. Only active promos are shown.</p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Image URL</th>
+                      <th>Preview</th>
+                      <th>Caption (optional)</th>
+                      <th>Link URL (optional)</th>
+                      <th>Active</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="promo-rows"></tbody>
+                </table>
+              </div>
+              <div class="actions-row">
+                <button id="add-promo" type="button" class="secondary">Add Promo</button>
+                <button id="save-promos" type="button">Save Promo Banner</button>
               </div>
             </section>
 

@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
     { code: "playtime", name: "Extended Playtime", flatFee: 0, nightlyFee: 10, active: true },
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
   ],
+  promos: [],
 };
 
 function sanitizeSettings(input) {
@@ -31,6 +32,7 @@ function sanitizeSettings(input) {
 
   const suites = Array.isArray(safe.suites) ? safe.suites : [];
   const addons = Array.isArray(safe.addons) ? safe.addons : [];
+  const promos = Array.isArray(safe.promos) ? safe.promos : [];
 
   return {
     booking: {
@@ -57,6 +59,14 @@ function sanitizeSettings(input) {
         active: addon.active !== false,
       }))
       .filter((addon) => addon.code && addon.name),
+    promos: promos
+      .map((promo) => ({
+        imageUrl: String(promo.imageUrl || "").trim().slice(0, 2000),
+        caption: String(promo.caption || "").trim().slice(0, 200),
+        linkUrl: String(promo.linkUrl || "").trim().slice(0, 2000),
+        active: promo.active !== false,
+      }))
+      .filter((promo) => promo.imageUrl),
   };
 }
 

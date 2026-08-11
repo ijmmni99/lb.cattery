@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
     { code: "playtime", name: "Extended Playtime", flatFee: 0, nightlyFee: 10, active: true },
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
   ],
+  promos: [],
 };
 
 const usernameInput = document.getElementById("admin-username");
@@ -42,13 +43,16 @@ const maxNightsEl = document.getElementById("max-nights");
 
 const suiteRowsEl = document.getElementById("suite-rows");
 const addonRowsEl = document.getElementById("addon-rows");
+const promoRowsEl = document.getElementById("promo-rows");
 
 const addSuiteBtn = document.getElementById("add-suite");
 const addAddonBtn = document.getElementById("add-addon");
+const addPromoBtn = document.getElementById("add-promo");
 const saveSettingsBtn = document.getElementById("save-settings");
 const saveBookingBtn = document.getElementById("save-booking");
 const saveSuitesBtn = document.getElementById("save-suites");
 const saveAddonsBtn = document.getElementById("save-addons");
+const savePromosBtn = document.getElementById("save-promos");
 
 function getAdminToken() {
   return localStorage.getItem("lb_admin_token") || "";
@@ -213,6 +217,43 @@ function renderAddonRows(addons) {
     ], ["Code", "Name", "Flat Fee (MYR)", "Nightly Fee (MYR)", "Active", ""]);
     addonRowsEl.appendChild(row);
   });
+}
+
+function renderPromoRows(promos) {
+  promoRowsEl.innerHTML = "";
+  promos.forEach((promo) => {
+    const imageUrlInput = createCellInput(promo.imageUrl || "");
+    imageUrlInput.placeholder = "https://... or assets/promo.jpg";
+    const preview = createPreviewImage(promo.imageUrl || "");
+    imageUrlInput.addEventListener("input", () => {
+      preview.src = imageUrlInput.value.trim();
+      preview.style.display = imageUrlInput.value.trim() ? "block" : "none";
+    });
+
+    const row = createTableRow([
+      imageUrlInput,
+      preview,
+      createCellInput(promo.caption || ""),
+      createCellInput(promo.linkUrl || ""),
+      createCellCheckbox(promo.active),
+      createDeleteButton(),
+    ], ["Image URL", "Preview", "Caption", "Link URL", "Active", ""]);
+    promoRowsEl.appendChild(row);
+  });
+}
+
+function collectPromoRows() {
+  return Array.from(promoRowsEl.querySelectorAll("tr"))
+    .map((row) => {
+      const inputs = row.querySelectorAll("input");
+      return {
+        imageUrl: (inputs[0].value || "").trim(),
+        caption: (inputs[1].value || "").trim(),
+        linkUrl: (inputs[2].value || "").trim(),
+        active: inputs[3].checked,
+      };
+    })
+    .filter((promo) => promo.imageUrl);
 }
 
 function collectSuiteRows() {
@@ -464,6 +505,7 @@ function applySettingsToForm(settings) {
   maxNightsEl.value = String(settings.booking?.maxNights || 30);
   renderSuiteRows(settings.suites || []);
   renderAddonRows(settings.addons || []);
+  renderPromoRows(settings.promos || []);
 }
 
 function collectSettingsFromForm() {
@@ -475,6 +517,7 @@ function collectSettingsFromForm() {
     },
     suites: collectSuiteRows(),
     addons: collectAddonRows(),
+    promos: collectPromoRows(),
   };
 }
 
@@ -582,10 +625,31 @@ addAddonBtn.addEventListener("click", () => {
   addonRowsEl.appendChild(row);
 });
 
+addPromoBtn.addEventListener("click", () => {
+  const imageUrlInput = createCellInput("");
+  imageUrlInput.placeholder = "https://... or assets/promo.jpg";
+  const preview = createPreviewImage("");
+  imageUrlInput.addEventListener("input", () => {
+    preview.src = imageUrlInput.value.trim();
+    preview.style.display = imageUrlInput.value.trim() ? "block" : "none";
+  });
+
+  const row = createTableRow([
+    imageUrlInput,
+    preview,
+    createCellInput(""),
+    createCellInput(""),
+    createCellCheckbox(true),
+    createDeleteButton(),
+  ], ["Image URL", "Preview", "Caption", "Link URL", "Active", ""]);
+  promoRowsEl.appendChild(row);
+});
+
 saveSettingsBtn.addEventListener("click", saveSettings);
 saveBookingBtn.addEventListener("click", saveSettings);
 saveSuitesBtn.addEventListener("click", saveSettings);
 saveAddonsBtn.addEventListener("click", saveSettings);
+savePromosBtn.addEventListener("click", saveSettings);
 
 function hidePageLoading() {
   const el = document.getElementById("page-loading");
