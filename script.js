@@ -607,6 +607,14 @@ if (calendarEl && calendarPopover) {
   window.addEventListener("resize", () => {
     if (!calendarPopover.hidden && activeCalendarDay) positionCalendarPopover(activeCalendarDay);
   });
+
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (!calendarPopover.hidden) closeCalendarPopover();
+    },
+    { capture: true, passive: true },
+  );
 }
 
 function refreshEstimate() {
