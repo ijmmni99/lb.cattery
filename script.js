@@ -465,11 +465,10 @@ async function renderAvailabilityCalendar() {
     const isoDate = isoDateFromParts(year, month, day);
     const count = bookingCountForDate(isoDate, suiteType, allBookings);
 
-    const dayEl = document.createElement("div");
+    const dayEl = document.createElement("button");
+    dayEl.type = "button";
     dayEl.className = `calendar-day ${dayClassByCount(count, suiteType)}`;
     dayEl.dataset.date = isoDate;
-    dayEl.tabIndex = 0;
-    dayEl.setAttribute("role", "button");
     dayEl.setAttribute("aria-haspopup", "dialog");
     dayEl.setAttribute(
       "aria-label",
@@ -595,14 +594,6 @@ if (calendarEl && calendarPopover) {
     toggleCalendarPopover(dayEl);
   });
 
-  calendarEl.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    const dayEl = event.target.closest(".calendar-day:not(.empty)");
-    if (!dayEl) return;
-    event.preventDefault();
-    toggleCalendarPopover(dayEl);
-  });
-
   document.addEventListener("click", (event) => {
     if (calendarPopover.hidden) return;
     const target = event.target;
@@ -712,12 +703,15 @@ function renderBookingSummary() {
 }
 
 function syncPricePanelSpacing() {
+  const layoutEl = document.querySelector("main.layout");
   if (!mobileLayoutQuery.matches) {
     bookingForm.style.paddingBottom = "";
+    if (layoutEl) layoutEl.style.paddingBottom = "";
     return;
   }
   const height = pricePanelEl.getBoundingClientRect().height;
   bookingForm.style.paddingBottom = `${height + 24}px`;
+  if (layoutEl) layoutEl.style.paddingBottom = `${height + 24}px`;
 }
 
 function showStep(index) {
@@ -758,13 +752,6 @@ bookingForm.addEventListener("keydown", (event) => {
 new ResizeObserver(syncPricePanelSpacing).observe(pricePanelEl);
 mobileLayoutQuery.addEventListener("change", syncPricePanelSpacing);
 window.addEventListener("resize", syncPricePanelSpacing);
-
-if ("IntersectionObserver" in window) {
-  const bookingCardVisibility = new IntersectionObserver(([entry]) => {
-    pricePanelEl.classList.toggle("price-panel-offscreen", !entry.isIntersecting);
-  });
-  bookingCardVisibility.observe(document.getElementById("booking-card"));
-}
 
 bookingForm.addEventListener("input", refreshEstimate);
 
