@@ -589,6 +589,15 @@ button.secondary {
   text-align: center;
 }
 
+.calendar-day {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  touch-action: manipulation;
+}
+
 .calendar-head {
   font-size: 0.74rem;
   font-weight: 700;
@@ -1197,12 +1206,6 @@ th {
     border-bottom: none;
     box-shadow: 0 -10px 24px rgba(138, 90, 31, 0.18);
     padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
-    transition: transform 200ms ease;
-  }
-
-  #booking-card .price-panel.price-panel-offscreen {
-    transform: translateY(120%);
-    pointer-events: none;
   }
 
   #booking-card .price-panel .actions-row {
