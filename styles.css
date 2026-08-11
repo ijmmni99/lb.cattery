@@ -666,7 +666,7 @@ button.secondary {
 
 .calendar-popover {
   position: fixed;
-  z-index: 40;
+  z-index: 60;
   width: 240px;
   max-width: calc(100vw - 1.2rem);
   background: var(--brand-paper);
