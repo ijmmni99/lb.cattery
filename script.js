@@ -48,8 +48,6 @@ const stepBackBtn = document.getElementById("step-back");
 const stepNextBtn = document.getElementById("step-next");
 const submitBookingBtn = document.getElementById("submit-booking");
 const bookingSummaryEl = document.getElementById("booking-summary");
-const pricePanelEl = document.querySelector("#booking-card .price-panel");
-const mobileLayoutQuery = window.matchMedia("(max-width: 900px)");
 
 const STEP_LABELS = ["Suite & Dates", "Cat Details", "Contact Info", "Review & Confirm"];
 let currentStep = 0;
@@ -827,19 +825,6 @@ function renderBookingSummary() {
   });
 }
 
-function syncPricePanelSpacing() {
-  const layoutEl = document.querySelector("main.layout");
-  const isFixed = getComputedStyle(pricePanelEl).position === "fixed";
-  if (!isFixed) {
-    bookingForm.style.paddingBottom = "";
-    if (layoutEl) layoutEl.style.paddingBottom = "";
-    return;
-  }
-  const height = pricePanelEl.getBoundingClientRect().height;
-  bookingForm.style.paddingBottom = `${height + 24}px`;
-  if (layoutEl) layoutEl.style.paddingBottom = `${height + 24}px`;
-}
-
 function showStep(index) {
   currentStep = index;
   const isLast = index === stepEls.length - 1;
@@ -854,7 +839,6 @@ function showStep(index) {
   submitBookingBtn.hidden = !isLast;
 
   if (isLast) renderBookingSummary();
-  syncPricePanelSpacing();
 }
 
 stepNextBtn.addEventListener("click", async () => {
@@ -874,10 +858,6 @@ bookingForm.addEventListener("keydown", (event) => {
     stepNextBtn.click();
   }
 });
-
-new ResizeObserver(syncPricePanelSpacing).observe(pricePanelEl);
-mobileLayoutQuery.addEventListener("change", syncPricePanelSpacing);
-window.addEventListener("resize", syncPricePanelSpacing);
 
 bookingForm.addEventListener("input", refreshEstimate);
 

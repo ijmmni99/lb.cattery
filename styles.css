@@ -1285,23 +1285,12 @@ th {
     width: 100%;
   }
 
-  #booking-form {
-    padding-bottom: 8.5rem;
-  }
-
   #booking-card .price-panel {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position: sticky;
+    bottom: 0.6rem;
     z-index: 40;
-    margin: 0;
-    max-width: 640px;
-    margin-inline: auto;
-    border-radius: 16px 16px 0 0;
     background: var(--brand-paper);
     border: 1px solid var(--brand-border);
-    border-bottom: none;
     box-shadow: 0 -10px 24px rgba(138, 90, 31, 0.18);
     padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
   }
