@@ -64,13 +64,7 @@ async function lookupNames(env, auth) {
 }
 
 async function sendEmail(env, { to, subject, html }) {
-  if (!env.RESEND_API_KEY) {
-    console.log("sendEmail skipped: RESEND_API_KEY is not set", { subject });
-    return;
-  }
-
-  const from = env.RESEND_FROM_EMAIL || "L&B Cattery <onboarding@resend.dev>";
-  console.log("sendEmail attempt", { subject, to, from });
+  if (!env.RESEND_API_KEY) return;
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -79,7 +73,7 @@ async function sendEmail(env, { to, subject, html }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from,
+      from: env.RESEND_FROM_EMAIL || "L&B Cattery <onboarding@resend.dev>",
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
@@ -89,11 +83,7 @@ async function sendEmail(env, { to, subject, html }) {
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     console.error("sendEmail failed", subject, res.status, detail);
-    return;
   }
-
-  const result = await res.json().catch(() => null);
-  console.log("sendEmail succeeded", { subject, to, id: result?.id });
 }
 
 async function buildBookingSummary(env, auth, booking) {
@@ -118,14 +108,7 @@ async function buildBookingSummary(env, auth, booking) {
 }
 
 async function sendAdminNewBookingEmail(env, auth, booking) {
-  if (!env.ADMIN_NOTIFY_EMAIL) {
-    console.log("sendAdminNewBookingEmail skipped: ADMIN_NOTIFY_EMAIL is not set", {
-      bookingId: booking.id,
-      adminNotifyEmailValue: JSON.stringify(env.ADMIN_NOTIFY_EMAIL),
-    });
-    return;
-  }
-  console.log("sendAdminNewBookingEmail firing", { bookingId: booking.id, adminNotifyEmail: env.ADMIN_NOTIFY_EMAIL });
+  if (!env.ADMIN_NOTIFY_EMAIL) return;
   const { catNames, suiteName, addOnNames, formattedTotal } = await buildBookingSummary(env, auth, booking);
 
   await sendEmail(env, {
@@ -254,15 +237,10 @@ export async function onRequest({ request, env }) {
       body: JSON.stringify(payload),
     });
 
-    console.log("booking insert result", { ok: res.ok, status: res.status, hasOwnerEmail: Boolean(body.owner_email) });
-
     if (res.ok && body.owner_email) {
       await sendAdminNewBookingEmail(env, adminAuth, payload).catch((err) =>
         console.error("sendAdminNewBookingEmail failed", err),
       );
-    } else if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      console.error("booking insert failed, skipping admin email", res.status, detail);
     }
 
     return new Response(null, { status: res.ok ? 200 : 500, headers: CORS });

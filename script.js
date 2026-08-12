@@ -507,11 +507,11 @@ async function isDateRangeAvailable(start, end, suiteType, currentBookings = nul
   return overlapsInSuite < (suiteCapacity[suiteType] || 1);
 }
 
-function calculateEstimate(formData, addOnCodes = []) {
+function calculateEstimate(formData, addOnCodes = [], catCount = 1) {
   const nights = Math.max(0, daysBetween(formData.checkIn, formData.checkOut));
   const suite = suiteByCode(formData.suiteType);
   if (!suite) return 0;
-  const suiteTotal = suite.nightlyRate * nights;
+  const suiteTotal = suite.nightlyRate * nights * Math.max(1, catCount);
   const addonsTotal = addOnCodes.reduce((sum, code) => {
     const addon = addonByCode(code);
     if (!addon) return sum;
@@ -739,7 +739,7 @@ function refreshEstimate() {
     estimatedTotalEl.textContent = formatMoney(0);
     return;
   }
-  estimatedTotalEl.textContent = formatMoney(calculateEstimate(formData, collectAddOns()));
+  estimatedTotalEl.textContent = formatMoney(calculateEstimate(formData, collectAddOns(), collectCats().length));
 }
 
 function showAvailabilityMessage(message, ok) {
@@ -873,12 +873,13 @@ bookingForm.addEventListener("submit", async (event) => {
 
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
   const addOns = collectAddOns();
+  const cats = collectCats();
   const booking = {
     ...formData,
-    cats: collectCats(),
+    cats,
     addOns,
     id: `LB-${Date.now().toString().slice(-6)}`,
-    totalPrice: calculateEstimate(formData, addOns),
+    totalPrice: calculateEstimate(formData, addOns, cats.length),
   };
 
   await saveBooking(booking);
