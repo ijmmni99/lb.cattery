@@ -92,6 +92,8 @@ function setWorkspaceVisible(visible) {
   saveBookingBtn.disabled = !visible;
   saveSuitesBtn.disabled = !visible;
   saveAddonsBtn.disabled = !visible;
+  addPromoBtn.disabled = !visible;
+  savePromosBtn.disabled = !visible;
 }
 
 function setLoginCardVisible(visible) {
@@ -294,8 +296,19 @@ async function fetchSettings() {
 }
 
 async function fetchBookings() {
-  const res = await fetch("/api/bookings");
-  if (!res.ok) return [];
+  const res = await fetch("/api/bookings", { headers: getAuthHeaders() });
+
+  if (res.status === 401) {
+    logout();
+    showStatus("Session expired. Please sign in again.", false);
+    return [];
+  }
+
+  if (!res.ok) {
+    showUpcomingStatus("Failed to load bookings.", false);
+    return [];
+  }
+
   return await res.json();
 }
 

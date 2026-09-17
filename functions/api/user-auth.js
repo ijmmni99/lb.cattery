@@ -70,16 +70,12 @@ export async function onRequest({ request, env }) {
 
     const existingRes = await fetch(`${usersBase}?email=eq.${encodeURIComponent(email)}&select=id&limit=1`, { headers: auth });
     if (!existingRes.ok) {
-      const detail = await existingRes.text();
-      return new Response(
-        JSON.stringify({
-          error: "Failed to validate user",
-          hint: "Check table public.app_users exists and API key has select permission.",
-          status: existingRes.status,
-          detail,
-        }),
-        { status: 500, headers: CORS },
-      );
+      // Log the database detail server-side; never return it to the browser.
+      console.error("signup lookup failed", existingRes.status, await existingRes.text().catch(() => ""));
+      return new Response(JSON.stringify({ error: "Sign up is unavailable right now. Please try again." }), {
+        status: 500,
+        headers: CORS,
+      });
     }
 
     const existingRows = await existingRes.json();
@@ -107,16 +103,11 @@ export async function onRequest({ request, env }) {
     });
 
     if (!insertRes.ok) {
-      const detail = await insertRes.text();
-      return new Response(
-        JSON.stringify({
-          error: "Failed to create user",
-          hint: "Check app_users schema, unique email constraint, and insert permission.",
-          status: insertRes.status,
-          detail,
-        }),
-        { status: 500, headers: CORS },
-      );
+      console.error("signup insert failed", insertRes.status, await insertRes.text().catch(() => ""));
+      return new Response(JSON.stringify({ error: "Could not create your account. Please try again." }), {
+        status: 500,
+        headers: CORS,
+      });
     }
 
     const token = await createSessionToken(email, userSecret, 12 * 60 * 60 * 1000, { name: fullName, role: "user" });
@@ -137,16 +128,11 @@ export async function onRequest({ request, env }) {
     );
 
     if (!res.ok) {
-      const detail = await res.text();
-      return new Response(
-        JSON.stringify({
-          error: "Login service unavailable",
-          hint: "Check table public.app_users exists and API key has select permission.",
-          status: res.status,
-          detail,
-        }),
-        { status: 500, headers: CORS },
-      );
+      console.error("login lookup failed", res.status, await res.text().catch(() => ""));
+      return new Response(JSON.stringify({ error: "Login is unavailable right now. Please try again." }), {
+        status: 500,
+        headers: CORS,
+      });
     }
 
     const rows = await res.json();

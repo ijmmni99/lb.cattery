@@ -68,8 +68,20 @@ create table if not exists public.app_users (
 	phone text,
 	email text not null unique,
 	password_hash text not null,
+	reset_token_hash text,
+	reset_expires_at timestamptz,
 	created_at timestamptz default now()
 );
+```
+
+`reset_token_hash` and `reset_expires_at` are required by
+[functions/api/forgot-password.js](functions/api/forgot-password.js). If your
+table predates password resets, add them:
+
+```sql
+alter table public.app_users
+	add column if not exists reset_token_hash text,
+	add column if not exists reset_expires_at timestamptz;
 ```
 
 ### Bookings table: multiple cats and add-ons per booking
@@ -117,21 +129,110 @@ create table if not exists public.bookings (
 	add_ons jsonb not null default '[]'::jsonb,
 	total_price numeric not null default 0,
 	notes text,
+	status text not null default 'pending',
 	created_at timestamptz default now()
 );
+
+create index if not exists bookings_range_idx
+	on public.bookings (suite_type, check_in, check_out);
+```
+
+`status` drives the admin approval workflow (`pending` -> `confirmed` ->
+`completed`, or `pending` -> `rejected`) and is required. Existing tables need:
+
+```sql
+alter table public.bookings
+	add column if not exists status text not null default 'pending';
 ```
 
 ## API Overview
 
+- `GET /api/availability`: **public** occupancy feed for the availability checker
+  and calendar. Returns only `{ suiteType, checkIn, checkOut, cats }` per occupied
+  stay — no names, emails, phone numbers or notes. Accepts optional `from` and
+  `to` (`YYYY-MM-DD`) to narrow the window.
 - `GET /api/settings`: public read of current settings
-- `POST /api/settings`: admin-only write, requires header `x-admin-key`
-- `GET /api/bookings`: public read bookings for availability calculations
-- `POST /api/bookings`: public booking submission
-- `DELETE /api/bookings?id=...`: admin-only delete, requires `x-admin-key`
+- `POST /api/settings`: admin-only write
+- `GET /api/bookings`: **admin-only** read of full booking records
+- `POST /api/bookings`: public booking submission (see below)
+- `PATCH /api/bookings?id=...`: admin-only status change
+- `DELETE /api/bookings?id=...`: admin-only delete
 - `POST /api/admin-login`: admin login with username/password, returns session token
 - `GET /api/admin-login`: verifies admin session token (`x-admin-token` or `Authorization: Bearer <token>`)
 - `POST /api/user-auth`: customer signup/login (`action` = `signup` or `login`)
 - `GET /api/user-auth`: verifies customer session token (`x-user-token`)
 - `GET /api/user-bookings`: returns only bookings that match signed-in user email
+- `POST /api/booking-lookup`: guest lookup by booking ID + email
+- `POST /api/forgot-password`: password reset request/confirm
 
 Note: `x-admin-key` is still accepted for backward compatibility, but admin login/session token is now the recommended flow.
+
+## How a booking is validated
+
+`POST /api/bookings` is the authority on every booking rule. The browser runs the
+same checks first so the customer gets immediate feedback, but nothing the client
+sends is trusted:
+
+- The **booking ID** is generated server-side (`LB-` + 8 random characters). The
+  client cannot choose it.
+- The **total price** is recomputed from stored settings; `total_price` sent by
+  the client is discarded.
+- The **status** is always forced to `pending`.
+- Only known columns are written — extra fields in the request body are dropped.
+- **Stay length** is checked against `minNights`/`maxNights`, and check-out must
+  be after check-in.
+- The **suite and add-ons** must exist and be active.
+- **Capacity** is checked in cat slots (see below) against bookings whose status
+  is `pending`, `confirmed` or `completed`. Rejected bookings do not block dates.
+- Submissions are refused entirely when `allowPublicBooking` is off.
+
+Rule violations return `409` with a human-readable `error`; malformed payloads
+return `400`.
+
+### Capacity is measured in cats
+
+A suite's `capacity` is the number of **cat slots** it holds, not the number of
+bookings. This matches pricing, which is `nightlyRate x nights x number of cats`.
+A Standard Suite with `capacity: 6` accepts any combination of bookings totalling
+six cats on a given night.
+
+### Known limitation: concurrent booking race
+
+The capacity check reads current occupancy and then inserts. Two submissions for
+the last slot that arrive within milliseconds of each other can both pass. Closing
+this properly needs a database-level constraint, for example:
+
+```sql
+create extension if not exists btree_gist;
+
+alter table public.bookings
+	add constraint bookings_no_overbooking
+	exclude using gist (
+		suite_type with =,
+		daterange(check_in, check_out) with &&
+	) where (status in ('pending', 'confirmed', 'completed'));
+```
+
+Note that a plain exclusion constraint enforces *one booking per suite per range*,
+which is stricter than the cat-slot model. If you want true multi-cat capacity
+enforced in the database, use a serializable transaction or an advisory lock
+around the check-and-insert instead.
+
+## Security notes
+
+- **Row Level Security.** The Pages Functions use the service role key and are the
+  only intended path to the data. Enable RLS on `public.bookings`, `public.app_users`
+  and `public.system_config` so the anon key cannot read these tables directly
+  through the Supabase REST endpoint.
+- **Static security headers** are set in [_headers](_headers), including a
+  Content-Security-Policy, `X-Frame-Options` and `Referrer-Policy`.
+- Database errors are logged server-side and never returned to the browser.
+
+## Tests
+
+```
+npm test
+```
+
+Runs the rule and endpoint tests in [tests/](tests/) with the built-in Node test
+runner (Node 18+). No dependencies to install.

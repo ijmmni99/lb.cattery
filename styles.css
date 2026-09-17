@@ -561,6 +561,37 @@ button.secondary {
   color: #b24826;
 }
 
+/* Inline validation feedback on the booking form, replacing blocking alert()s. */
+.booking-status {
+  min-height: 0;
+  margin: 0.6rem 0 0;
+}
+
+.booking-status:not(:empty) {
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.booking-status.warn:not(:empty) {
+  background: #fdf0ec;
+  border-color: #e7b7a6;
+}
+
+.booking-status.ok:not(:empty) {
+  background: #eef8ee;
+  border-color: #b4d9b6;
+}
+
+.calendar-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 1rem 0;
+  text-align: center;
+  font-weight: 600;
+  color: #b24826;
+}
+
 .calendar-toolbar {
   margin-top: 0.8rem;
   display: flex;

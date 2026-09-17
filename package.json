@@ -1,0 +1,10 @@
+{
+  "name": "lb-cattery",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "L&B Cattery booking site (Cloudflare Pages + Supabase)",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}

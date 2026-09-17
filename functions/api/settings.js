@@ -1,92 +1,22 @@
-import { getAdminSecret, getAdminTokenFromRequest, verifyAdminToken } from "./_adminAuth.js";
+import { isAdminRequest } from "./_adminAuth.js";
+import { DEFAULT_SETTINGS, getRestAuth, sanitizeSettings } from "./_settings.js";
 
 const CORS = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type, x-admin-token, x-admin-key, authorization",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Content-Type": "application/json",
 };
 
-const DEFAULT_SETTINGS = {
-  booking: {
-    allowPublicBooking: true,
-    minNights: 1,
-    maxNights: 30,
-  },
-  suites: [
-    { code: "standard", name: "Standard Suite", nightlyRate: 20, capacity: 6, imageUrl: "", active: true },
-    { code: "deluxe", name: "Deluxe Suite", nightlyRate: 35, capacity: 4, imageUrl: "", active: true },
-    { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, imageUrl: "", active: true },
-  ],
-  addons: [
-    { code: "grooming", name: "Grooming Package", flatFee: 18, nightlyFee: 0, active: true },
-    { code: "playtime", name: "Extended Playtime", flatFee: 0, nightlyFee: 10, active: true },
-    { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
-  ],
-  promos: [],
-};
-
-function sanitizeSettings(input) {
-  const safe = input && typeof input === "object" ? input : {};
-  const booking = safe.booking && typeof safe.booking === "object" ? safe.booking : {};
-
-  const suites = Array.isArray(safe.suites) ? safe.suites : [];
-  const addons = Array.isArray(safe.addons) ? safe.addons : [];
-  const promos = Array.isArray(safe.promos) ? safe.promos : [];
-
-  return {
-    booking: {
-      allowPublicBooking: booking.allowPublicBooking !== false,
-      minNights: Number(booking.minNights) > 0 ? Number(booking.minNights) : 1,
-      maxNights: Number(booking.maxNights) > 0 ? Number(booking.maxNights) : 30,
-    },
-    suites: suites
-      .map((suite) => ({
-        code: String(suite.code || "").trim(),
-        name: String(suite.name || "").trim(),
-        nightlyRate: Number(suite.nightlyRate) || 0,
-        capacity: Math.max(1, Number(suite.capacity) || 1),
-        imageUrl: String(suite.imageUrl || "").trim().slice(0, 2000),
-        active: suite.active !== false,
-      }))
-      .filter((suite) => suite.code && suite.name),
-    addons: addons
-      .map((addon) => ({
-        code: String(addon.code || "").trim(),
-        name: String(addon.name || "").trim(),
-        flatFee: Number(addon.flatFee) || 0,
-        nightlyFee: Number(addon.nightlyFee) || 0,
-        active: addon.active !== false,
-      }))
-      .filter((addon) => addon.code && addon.name),
-    promos: promos
-      .map((promo) => ({
-        imageUrl: String(promo.imageUrl || "").trim().slice(0, 2000),
-        caption: String(promo.caption || "").trim().slice(0, 200),
-        linkUrl: String(promo.linkUrl || "").trim().slice(0, 2000),
-        active: promo.active !== false,
-      }))
-      .filter((promo) => promo.imageUrl),
-  };
+function json(body, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(body), { status, headers: { ...CORS, ...extraHeaders } });
 }
 
-async function readSettings(base, headers) {
-  const res = await fetch(`${base}?key=eq.global&select=value&limit=1`, { headers });
-  if (!res.ok) {
-    return DEFAULT_SETTINGS;
-  }
-
-  const rows = await res.json();
-  if (!Array.isArray(rows) || rows.length === 0 || !rows[0].value) {
-    return DEFAULT_SETTINGS;
-  }
-
-  const merged = {
-    ...DEFAULT_SETTINGS,
-    ...rows[0].value,
-  };
-
-  return sanitizeSettings(merged);
+async function upsertSettings(base, auth, settings) {
+  return fetch(base, {
+    method: "POST",
+    headers: { ...auth, Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key: "global", value: settings, updated_at: new Date().toISOString() }),
+  });
 }
 
 export async function onRequest({ request, env }) {
@@ -94,80 +24,57 @@ export async function onRequest({ request, env }) {
     return new Response(null, { headers: CORS });
   }
 
-  const { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ADMIN_API_KEY } = env;
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return new Response(JSON.stringify({ error: "Missing Supabase env vars" }), { status: 500, headers: CORS });
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+    return json({ error: "Service unavailable" }, 500);
   }
 
-  const base = `${SUPABASE_URL}/rest/v1/system_config`;
-  const restKey = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
-  const auth = {
-    apikey: restKey,
-    Authorization: `Bearer ${restKey}`,
-    "Content-Type": "application/json",
-  };
+  const base = `${env.SUPABASE_URL}/rest/v1/system_config`;
+  const auth = getRestAuth(env);
 
   if (request.method === "GET") {
-    const settings = await readSettings(base, auth);
+    const res = await fetch(`${base}?key=eq.global&select=value&limit=1`, { headers: auth });
+    if (!res.ok) {
+      console.error("settings read failed", res.status, await res.text().catch(() => ""));
+      return json(DEFAULT_SETTINGS);
+    }
 
-    // Auto-bootstrap default row if table exists but no record has been created yet.
-    await fetch(base, {
-      method: "POST",
-      headers: {
-        ...auth,
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify({
-        key: "global",
-        value: settings,
-        updated_at: new Date().toISOString(),
-      }),
-    }).catch(() => null);
+    const rows = await res.json().catch(() => []);
+    const stored = Array.isArray(rows) && rows[0]?.value ? rows[0].value : null;
 
-    return new Response(JSON.stringify(settings), { headers: CORS });
+    if (!stored) {
+      // Bootstrap the defaults exactly once, when the row genuinely does not
+      // exist. This used to run on every GET -- a database write per visitor.
+      await upsertSettings(base, auth, DEFAULT_SETTINGS).catch((err) =>
+        console.error("settings bootstrap failed", err),
+      );
+      return json(DEFAULT_SETTINGS);
+    }
+
+    return json(sanitizeSettings({ ...DEFAULT_SETTINGS, ...stored }), 200, {
+      "Cache-Control": "public, max-age=30",
+    });
   }
 
   if (request.method === "POST") {
-    const adminSecret = getAdminSecret(env);
-    const token = getAdminTokenFromRequest(request);
-    const isTokenValid = await verifyAdminToken(token, adminSecret);
-
-    const expectedAdminKey = ADMIN_API_KEY || SUPABASE_ANON_KEY;
-    const providedKey = request.headers.get("x-admin-key") || "";
-    const isLegacyKeyValid = Boolean(expectedAdminKey && providedKey === expectedAdminKey);
-
-    if (!isTokenValid && !isLegacyKeyValid) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: CORS });
+    if (!(await isAdminRequest(request, env))) {
+      return json({ error: "Unauthorized" }, 401);
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const settings = sanitizeSettings(body);
 
-    const upsertPayload = {
-      key: "global",
-      value: settings,
-      updated_at: new Date().toISOString(),
-    };
-
-    const res = await fetch(base, {
-      method: "POST",
-      headers: {
-        ...auth,
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify(upsertPayload),
-    });
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      return new Response(
-        JSON.stringify({ error: "Failed to save settings", status: res.status, detail }),
-        { status: 500, headers: CORS },
-      );
+    if (!settings.suites.length) {
+      return json({ error: "At least one suite is required" }, 400);
     }
 
-    return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+    const res = await upsertSettings(base, auth, settings);
+    if (!res.ok) {
+      console.error("settings save failed", res.status, await res.text().catch(() => ""));
+      return json({ error: "Failed to save settings" }, 500);
+    }
+
+    return json({ ok: true, settings });
   }
 
-  return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: CORS });
+  return json({ error: "Not found" }, 404);
 }

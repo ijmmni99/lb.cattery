@@ -48,6 +48,7 @@ const stepBackBtn = document.getElementById("step-back");
 const stepNextBtn = document.getElementById("step-next");
 const submitBookingBtn = document.getElementById("submit-booking");
 const bookingSummaryEl = document.getElementById("booking-summary");
+const bookingStatusEl = document.getElementById("booking-status");
 
 const STEP_LABELS = ["Suite & Dates", "Cat Details", "Contact Info", "Review & Confirm"];
 let currentStep = 0;
@@ -59,6 +60,7 @@ const calendarState = {
 
 let calendarBookingsCache = [];
 let activeCalendarDay = null;
+let calendarRequestToken = 0;
 
 let promoSlides = [];
 let promoIndex = 0;
@@ -111,46 +113,35 @@ function addonByCode(code) {
   return settings.addons.find((addon) => addon.code === code && addon.active);
 }
 
-function getSuiteCapacityMap() {
-  return Object.fromEntries(settings.suites.filter((suite) => suite.active).map((suite) => [suite.code, Number(suite.capacity) || 1]));
+/** Cat slots a suite holds. Capacity is measured in cats, matching per-cat pricing. */
+function suiteCapacity(suiteType) {
+  const suite = suiteByCode(suiteType);
+  return suite ? Math.max(1, Number(suite.capacity) || 1) : 1;
 }
 
-async function getBookings() {
-  const res = await fetch("/api/bookings");
+/**
+ * Public occupancy feed. Returns only which suite is busy, for which nights, for
+ * how many cats -- no owner names, emails or notes.
+ */
+async function getOccupancy() {
+  const res = await fetch("/api/availability");
   if (!res.ok) {
-    console.error("getBookings failed", res.status);
-    return [];
+    console.error("getOccupancy failed", res.status);
+    throw new Error("Could not load availability. Please try again.");
   }
   const data = await res.json();
-  return data.map((r) => ({
-    id: r.id,
-    ownerName: r.owner_name,
-    ownerEmail: r.owner_email,
-    ownerPhone: r.owner_phone,
-    cats: Array.isArray(r.cats) && r.cats.length
-      ? r.cats
-      : r.cat_name
-        ? [{ name: r.cat_name, breed: r.breed, age: r.age }]
-        : [],
-    suiteType: r.suite_type,
-    checkIn: r.check_in,
-    checkOut: r.check_out,
-    addOns: Array.isArray(r.add_ons) && r.add_ons.length
-      ? r.add_ons
-      : r.add_on
-        ? [r.add_on]
-        : [],
-    totalPrice: r.total_price,
-    notes: r.notes,
-  }));
+  return Array.isArray(data.occupancy) ? data.occupancy : [];
 }
 
+/**
+ * The server recomputes the id, price and availability; this payload is a request,
+ * not a record. The booking id comes back in the response.
+ */
 async function saveBooking(booking) {
   const res = await fetch("/api/bookings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      id: booking.id,
       owner_name: booking.ownerName,
       owner_email: booking.ownerEmail,
       owner_phone: booking.ownerPhone,
@@ -159,14 +150,16 @@ async function saveBooking(booking) {
       check_in: booking.checkIn,
       check_out: booking.checkOut,
       add_ons: booking.addOns,
-      total_price: booking.totalPrice,
       notes: booking.notes || null,
     }),
   });
+
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error("saveBooking failed", res.status);
-    throw new Error("Booking save failed");
+    console.error("saveBooking failed", res.status, data);
+    throw new Error(data.error || "We could not save your booking. Please try again.");
   }
+  return data;
 }
 
 async function getSettings() {
@@ -330,7 +323,7 @@ function renderSuiteCards(suiteOptions) {
     radio.name = "suiteType";
     radio.value = suite.code;
     radio.required = true;
-    if (index === 0) radio.checked = true;
+    if (index === 0) radio.defaultChecked = true;
 
     const media = document.createElement("div");
     media.className = "suite-card-media";
@@ -419,6 +412,7 @@ function createCatRow() {
   removeBtn.addEventListener("click", () => {
     row.remove();
     updateCatRowChrome();
+    refreshEstimate();
   });
   header.append(title, removeBtn);
 
@@ -455,6 +449,7 @@ function updateCatRowChrome() {
 function addCatRow() {
   catRowsEl.appendChild(createCatRow());
   updateCatRowChrome();
+  refreshEstimate();
 }
 
 function resetCatRows() {
@@ -498,13 +493,17 @@ function datesOverlap(aStart, aEnd, bStart, bEnd) {
   return startA < endB && endA > startB;
 }
 
-async function isDateRangeAvailable(start, end, suiteType, currentBookings = null) {
-  const suiteCapacity = getSuiteCapacityMap();
-  const bookings = currentBookings ?? await getBookings();
-  const overlapsInSuite = bookings.filter(
-    (booking) => booking.suiteType === suiteType && datesOverlap(start, end, booking.checkIn, booking.checkOut),
-  ).length;
-  return overlapsInSuite < (suiteCapacity[suiteType] || 1);
+/** Cat slots already taken in a suite across a date range. */
+function catsBookedInRange(occupancy, suiteType, start, end) {
+  return occupancy
+    .filter((entry) => entry.suiteType === suiteType && datesOverlap(start, end, entry.checkIn, entry.checkOut))
+    .reduce((sum, entry) => sum + (Number(entry.cats) || 1), 0);
+}
+
+/** Free cat slots in a suite across a date range. Negative is clamped to zero. */
+async function spacesLeftInRange(start, end, suiteType, currentOccupancy = null) {
+  const occupancy = currentOccupancy ?? (await getOccupancy());
+  return Math.max(0, suiteCapacity(suiteType) - catsBookedInRange(occupancy, suiteType, start, end));
 }
 
 function calculateEstimate(formData, addOnCodes = [], catCount = 1) {
@@ -533,28 +532,44 @@ function isoDateFromParts(year, month, day) {
   return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
-function bookingCountForDate(dateIso, suiteType, allBookings) {
-  return allBookings.filter(
-    (booking) => booking.suiteType === suiteType && dateIso >= booking.checkIn && dateIso < booking.checkOut,
-  ).length;
+function catsBookedOnDate(dateIso, suiteType, occupancy) {
+  return occupancy
+    .filter((entry) => entry.suiteType === suiteType && dateIso >= entry.checkIn && dateIso < entry.checkOut)
+    .reduce((sum, entry) => sum + (Number(entry.cats) || 1), 0);
 }
 
 function dayClassByCount(count, suiteType) {
-  const suiteCapacity = getSuiteCapacityMap();
-  const cap = suiteCapacity[suiteType] || 1;
-  if (count >= cap) return "full";
+  if (count >= suiteCapacity(suiteType)) return "full";
   if (count > 0) return "limited";
   return "available";
 }
 
 async function renderAvailabilityCalendar() {
+  // Prev/Next can be clicked faster than the fetch resolves; only the newest
+  // request is allowed to paint.
+  const token = ++calendarRequestToken;
   const suiteType = availabilitySuite.value;
   const { year, month } = calendarState;
   const { start, end } = getMonthBounds(year, month);
   const firstWeekday = start.getDay();
   const daysInMonth = end.getDate();
-  const allBookings = await getBookings();
-  calendarBookingsCache = allBookings;
+
+  let occupancy;
+  try {
+    occupancy = await getOccupancy();
+  } catch (err) {
+    if (token !== calendarRequestToken) return;
+    calendarEl.innerHTML = "";
+    const errorEl = document.createElement("p");
+    errorEl.className = "calendar-error";
+    errorEl.textContent = "Could not load availability right now. Please refresh the page.";
+    calendarEl.appendChild(errorEl);
+    return;
+  }
+
+  if (token !== calendarRequestToken) return;
+
+  calendarBookingsCache = occupancy;
   closeCalendarPopover();
 
   calendarTitleEl.textContent = new Intl.DateTimeFormat("en-MY", {
@@ -577,9 +592,11 @@ async function renderAvailabilityCalendar() {
     calendarEl.appendChild(pad);
   }
 
+  const capacity = suiteCapacity(suiteType);
+
   for (let day = 1; day <= daysInMonth; day += 1) {
     const isoDate = isoDateFromParts(year, month, day);
-    const count = bookingCountForDate(isoDate, suiteType, allBookings);
+    const count = catsBookedOnDate(isoDate, suiteType, occupancy);
 
     const dayEl = document.createElement("button");
     dayEl.type = "button";
@@ -588,7 +605,7 @@ async function renderAvailabilityCalendar() {
     dayEl.setAttribute("aria-haspopup", "dialog");
     dayEl.setAttribute(
       "aria-label",
-      `${formatDateLong(isoDate)}: ${count > 0 ? `${count} booking${count > 1 ? "s" : ""}` : "no bookings"}. Tap for summary.`,
+      `${formatDateLong(isoDate)}: ${count} of ${capacity} cat space${capacity === 1 ? "" : "s"} booked. Tap for summary.`,
     );
 
     const dayNum = document.createElement("strong");
@@ -611,15 +628,18 @@ function formatDateLong(dateIso) {
   }).format(parseDate(dateIso));
 }
 
-function bookingsSummaryForDate(dateIso, allBookings) {
-  const matches = allBookings.filter((booking) => dateIso >= booking.checkIn && dateIso < booking.checkOut);
+function bookingsSummaryForDate(dateIso, occupancy) {
+  const matches = occupancy.filter((entry) => dateIso >= entry.checkIn && dateIso < entry.checkOut);
   const bySuite = new Map();
-  matches.forEach((booking) => {
-    const suite = suiteByCode(booking.suiteType);
-    const label = suite ? suite.name : booking.suiteType;
-    bySuite.set(label, (bySuite.get(label) || 0) + 1);
+  let total = 0;
+  matches.forEach((entry) => {
+    const suite = suiteByCode(entry.suiteType);
+    const label = suite ? suite.name : entry.suiteType;
+    const cats = Number(entry.cats) || 1;
+    total += cats;
+    bySuite.set(label, (bySuite.get(label) || 0) + cats);
   });
-  return { total: matches.length, bySuite };
+  return { total, bySuite };
 }
 
 function closeCalendarPopover() {
@@ -664,12 +684,12 @@ function renderCalendarPopover(dateIso, anchorEl) {
   if (total === 0) {
     const empty = document.createElement("p");
     empty.className = "popover-empty";
-    empty.textContent = "No bookings on this date.";
+    empty.textContent = "No cats booked in on this date.";
     calendarPopover.appendChild(empty);
   } else {
     const summaryLine = document.createElement("p");
     summaryLine.className = "popover-total";
-    summaryLine.textContent = `${total} booking${total > 1 ? "s" : ""} total`;
+    summaryLine.textContent = `${total} cat${total > 1 ? "s" : ""} booked in across all suites`;
 
     const list = document.createElement("ul");
     bySuite.forEach((count, label) => {
@@ -677,7 +697,7 @@ function renderCalendarPopover(dateIso, anchorEl) {
       const name = document.createElement("span");
       name.textContent = label;
       const num = document.createElement("span");
-      num.textContent = `${count} booking${count > 1 ? "s" : ""}`;
+      num.textContent = `${count} cat${count > 1 ? "s" : ""}`;
       li.append(name, num);
       list.appendChild(li);
     });
@@ -748,6 +768,13 @@ function showAvailabilityMessage(message, ok) {
   availabilityResult.classList.add(ok ? "ok" : "warn");
 }
 
+function showBookingMessage(message, ok) {
+  if (!bookingStatusEl) return;
+  bookingStatusEl.textContent = message;
+  bookingStatusEl.classList.remove("ok", "warn");
+  if (message) bookingStatusEl.classList.add(ok ? "ok" : "warn");
+}
+
 function applyBookingStatus() {
   const allowed = settings.booking.allowPublicBooking !== false;
   const formInputs = bookingForm.querySelectorAll("input, select, textarea, button");
@@ -769,31 +796,49 @@ function validateStepFields(index) {
   return true;
 }
 
+/**
+ * Client-side mirror of the server rules -- fast feedback only. The server
+ * revalidates everything, so a bypass here cannot create an invalid booking.
+ */
 async function validateBookingRules() {
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
   const nights = daysBetween(formData.checkIn, formData.checkOut);
+  const catCount = Math.max(1, collectCats().length);
 
   if (parseDate(formData.checkOut) <= parseDate(formData.checkIn)) {
-    alert("Check-out date must be after check-in date.");
+    showBookingMessage("Check-out date must be after check-in date.", false);
     return false;
   }
 
   if (nights < settings.booking.minNights) {
-    alert(`Minimum stay is ${settings.booking.minNights} night(s).`);
+    showBookingMessage(`Minimum stay is ${settings.booking.minNights} night(s).`, false);
     return false;
   }
 
   if (nights > settings.booking.maxNights) {
-    alert(`Maximum stay is ${settings.booking.maxNights} night(s).`);
+    showBookingMessage(`Maximum stay is ${settings.booking.maxNights} night(s).`, false);
     return false;
   }
 
-  const bookings = await getBookings();
-  if (!(await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings))) {
-    alert("Those dates are currently unavailable. Please choose another range.");
+  let spaces;
+  try {
+    spaces = await spacesLeftInRange(formData.checkIn, formData.checkOut, formData.suiteType);
+  } catch (err) {
+    showBookingMessage(err.message || "Could not check availability. Please try again.", false);
     return false;
   }
 
+  if (spaces < catCount) {
+    showBookingMessage(
+      spaces === 0
+        ? "That suite is fully booked for those dates. Please choose another range."
+        : `Only ${spaces} cat space(s) left in that suite for those dates; you selected ${catCount}.`,
+      false,
+    );
+    return false;
+  }
+
+  showBookingMessage("", true);
   return true;
 }
 
@@ -842,8 +887,21 @@ function showStep(index) {
 }
 
 stepNextBtn.addEventListener("click", async () => {
+  if (stepNextBtn.disabled) return;
   if (!validateStepFields(currentStep)) return;
-  if (currentStep === 0 && !(await validateBookingRules())) return;
+
+  // Step 0 checks live availability, so show progress rather than a dead button.
+  if (currentStep === 0) {
+    stepNextBtn.disabled = true;
+    stepNextBtn.textContent = "Checking...";
+    try {
+      if (!(await validateBookingRules())) return;
+    } finally {
+      stepNextBtn.textContent = "Next";
+      stepNextBtn.disabled = false;
+    }
+  }
+
   showStep(currentStep + 1);
 });
 
@@ -864,35 +922,47 @@ bookingForm.addEventListener("input", refreshEstimate);
 bookingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
+  if (submitBookingBtn.disabled) return;
+
   if (settings.booking.allowPublicBooking === false) {
-    alert("Bookings are currently closed.");
+    showBookingMessage("Bookings are currently closed.", false);
     return;
   }
 
-  if (!(await validateBookingRules())) return;
+  submitBookingBtn.disabled = true;
+  submitBookingBtn.textContent = "Submitting...";
 
-  const formData = Object.fromEntries(new FormData(bookingForm).entries());
-  const addOns = collectAddOns();
-  const cats = collectCats();
-  const booking = {
-    ...formData,
-    cats,
-    addOns,
-    id: `LB-${Date.now().toString().slice(-6)}`,
-    totalPrice: calculateEstimate(formData, addOns, cats.length),
-  };
+  try {
+    if (!(await validateBookingRules())) return;
 
-  await saveBooking(booking);
-  availabilitySuite.value = formData.suiteType;
-  bookingForm.reset();
-  resetCatRows();
-  refreshEstimate();
-  showStep(0);
-  await renderAvailabilityCalendar();
-  showAvailabilityMessage(
-    `Booking submitted. Booking ID: ${booking.id} — we'll review it and email ${booking.ownerEmail} once it's confirmed. Keep the ID to look up this booking later.`,
-    true,
-  );
+    const formData = Object.fromEntries(new FormData(bookingForm).entries());
+    const booking = {
+      ...formData,
+      cats: collectCats(),
+      addOns: collectAddOns(),
+    };
+
+    const saved = await saveBooking(booking);
+
+    availabilitySuite.value = formData.suiteType;
+    bookingForm.reset();
+    updateSuiteCardSelection();
+    resetCatRows();
+    refreshEstimate();
+    showStep(0);
+    showBookingMessage("", true);
+    await renderAvailabilityCalendar();
+    showAvailabilityMessage(
+      `Booking submitted. Booking ID: ${saved.id} — we've emailed ${formData.ownerEmail} a copy, and we'll email again once it's confirmed. Keep the ID to look up this booking later.`,
+      true,
+    );
+  } catch (err) {
+    console.error("booking submission failed", err);
+    showBookingMessage(err.message || "We could not save your booking. Please try again.", false);
+  } finally {
+    submitBookingBtn.textContent = "Confirm Reservation";
+    submitBookingBtn.disabled = settings.booking.allowPublicBooking === false;
+  }
 });
 
 checkAvailabilityBtn.addEventListener("click", async () => {
@@ -919,14 +989,25 @@ checkAvailabilityBtn.addEventListener("click", async () => {
     return;
   }
 
-  const available = await isDateRangeAvailable(start, end, suiteType);
-  if (available) {
-    showAvailabilityMessage("Great news. Those dates are currently available.", true);
-  } else {
-    showAvailabilityMessage("That period is fully booked. Try another date range.", false);
-  }
+  checkAvailabilityBtn.disabled = true;
+  showAvailabilityMessage("Checking those dates...", true);
 
-  await renderAvailabilityCalendar();
+  try {
+    const spaces = await spacesLeftInRange(start, end, suiteType);
+    if (spaces > 0) {
+      showAvailabilityMessage(
+        `Great news. ${spaces} cat space${spaces === 1 ? "" : "s"} still available for those dates.`,
+        true,
+      );
+    } else {
+      showAvailabilityMessage("That period is fully booked. Try another date range.", false);
+    }
+    await renderAvailabilityCalendar();
+  } catch (err) {
+    showAvailabilityMessage(err.message || "Could not check availability. Please try again.", false);
+  } finally {
+    checkAvailabilityBtn.disabled = false;
+  }
 });
 
 availabilitySuite.addEventListener("change", async () => {

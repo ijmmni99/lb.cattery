@@ -66,3 +66,17 @@ export function getAdminTokenFromRequest(request) {
 export function getAdminSecret(env) {
   return env.ADMIN_TOKEN_SECRET || env.ADMIN_API_KEY || env.SUPABASE_ANON_KEY || "";
 }
+
+/**
+ * True when the request carries a valid admin session token, or the legacy
+ * `x-admin-key` header. Centralises the check that was duplicated in every
+ * admin-only branch.
+ */
+export async function isAdminRequest(request, env) {
+  const token = getAdminTokenFromRequest(request);
+  if (await verifyAdminToken(token, getAdminSecret(env))) return true;
+
+  const expectedAdminKey = env.ADMIN_API_KEY || env.SUPABASE_ANON_KEY;
+  const providedKey = request.headers.get("x-admin-key") || "";
+  return Boolean(expectedAdminKey && providedKey === expectedAdminKey);
+}
