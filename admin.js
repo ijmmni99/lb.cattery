@@ -467,19 +467,29 @@ async function login() {
     return;
   }
 
-  const res = await fetch("/api/admin-login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
+  let res;
+  try {
+    res = await fetch("/api/admin-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch (err) {
+    showStatus("Could not reach the server. Check your connection and try again.", false);
+    return;
+  }
+
+  const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    showStatus("Invalid admin credentials.", false);
+    // Rate-limit and misconfiguration responses carry their own message; only a
+    // genuine 401 means the credentials were wrong.
+    const fallback = res.status === 401 ? "Invalid admin credentials." : "Sign in failed. Please try again.";
+    showStatus(data.error || fallback, false);
     setWorkspaceVisible(false);
     return;
   }
 
-  const data = await res.json();
   setAdminToken(data.token);
   passwordInput.value = "";
   showStatus("Signed in as administrator.", true);

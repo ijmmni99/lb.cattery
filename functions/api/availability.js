@@ -1,12 +1,8 @@
+import { httpContext } from "./_http.js";
 import { getRestAuth } from "./_settings.js";
 import { OCCUPYING_STATUSES, countCats, isValidDate } from "./_bookingRules.js";
 
-const CORS = {
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Content-Type": "application/json",
-  "Cache-Control": "no-store",
-};
+const HTTP_OPTIONS = { methods: "GET, OPTIONS", allowHeaders: "Content-Type" };
 
 const DEFAULT_PAST_DAYS = 45;
 const DEFAULT_FUTURE_DAYS = 400;
@@ -24,16 +20,13 @@ function isoDay(offsetDays = 0) {
  * returned owner names, emails, phone numbers and care notes to anyone who asked.
  */
 export async function onRequest({ request, env }) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS });
-  }
+  const http = httpContext(request, env, HTTP_OPTIONS);
 
-  if (request.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: CORS });
-  }
+  if (request.method === "OPTIONS") return http.preflight();
+  if (request.method !== "GET") return http.json({ error: "Not found" }, 404);
 
   if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-    return new Response(JSON.stringify({ error: "Service unavailable" }), { status: 500, headers: CORS });
+    return http.json({ error: "Service unavailable" }, 500);
   }
 
   const { searchParams } = new URL(request.url);
@@ -54,7 +47,7 @@ export async function onRequest({ request, env }) {
 
   if (!res.ok) {
     console.error("availability query failed", res.status, await res.text().catch(() => ""));
-    return new Response(JSON.stringify({ error: "Failed to load availability" }), { status: 500, headers: CORS });
+    return http.json({ error: "Failed to load availability" }, 500);
   }
 
   const rows = await res.json().catch(() => []);
@@ -65,5 +58,5 @@ export async function onRequest({ request, env }) {
     cats: countCats(row),
   }));
 
-  return new Response(JSON.stringify({ from, to, occupancy }), { headers: CORS });
+  return http.json({ from, to, occupancy });
 }

@@ -1,15 +1,11 @@
 import { isAdminRequest } from "./_adminAuth.js";
+import { httpContext } from "./_http.js";
 import { DEFAULT_SETTINGS, getRestAuth, sanitizeSettings } from "./_settings.js";
 
-const CORS = {
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-token, x-admin-key, authorization",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Content-Type": "application/json",
+const HTTP_OPTIONS = {
+  methods: "GET, POST, OPTIONS",
+  allowHeaders: "Content-Type, x-admin-token, x-admin-key, authorization",
 };
-
-function json(body, status = 200, extraHeaders = {}) {
-  return new Response(JSON.stringify(body), { status, headers: { ...CORS, ...extraHeaders } });
-}
 
 async function upsertSettings(base, auth, settings) {
   return fetch(base, {
@@ -20,9 +16,10 @@ async function upsertSettings(base, auth, settings) {
 }
 
 export async function onRequest({ request, env }) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS });
-  }
+  const http = httpContext(request, env, HTTP_OPTIONS);
+  const json = (body, status = 200, extra = {}) => http.json(body, status, extra);
+
+  if (request.method === "OPTIONS") return http.preflight();
 
   if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
     return json({ error: "Service unavailable" }, 500);

@@ -1,4 +1,6 @@
 import { isAdminRequest } from "./_adminAuth.js";
+import { httpContext } from "./_http.js";
+import { clientIp, enforceRateLimit } from "./_rateLimit.js";
 import { getRestAuth, readSettings } from "./_settings.js";
 import {
   OCCUPYING_STATUSES,
@@ -10,16 +12,10 @@ import {
   validateBookingRules,
 } from "./_bookingRules.js";
 
-const CORS = {
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-token, x-admin-key, authorization",
-  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Content-Type": "application/json",
-  "Cache-Control": "no-store",
+const HTTP_OPTIONS = {
+  methods: "GET, POST, PATCH, DELETE, OPTIONS",
+  allowHeaders: "Content-Type, x-admin-token, x-admin-key, authorization",
 };
-
-function json(body, status = 200) {
-  return new Response(body === null ? null : JSON.stringify(body), { status, headers: CORS });
-}
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -179,9 +175,10 @@ const STATUS_EMAIL_SENDERS = {
 };
 
 export async function onRequest({ request, env }) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS });
-  }
+  const http = httpContext(request, env, HTTP_OPTIONS);
+  const json = (body, status = 200, extra = {}) => http.json(body, status, extra);
+
+  if (request.method === "OPTIONS") return http.preflight();
 
   if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
     return json({ error: "Service unavailable" }, 500);
@@ -210,6 +207,14 @@ export async function onRequest({ request, env }) {
   }
 
   if (request.method === "POST") {
+    const limited = await enforceRateLimit(env, http, {
+      key: `booking-submit:${clientIp(request)}`,
+      limit: 10,
+      windowSeconds: 60 * 60,
+      message: "Too many booking attempts. Please wait and try again, or contact us directly.",
+    });
+    if (limited) return limited;
+
     const body = await request.json().catch(() => null);
 
     const validationError = validateBookingPayload(body);

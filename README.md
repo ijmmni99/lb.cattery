@@ -27,18 +27,87 @@ preview thumbnail.
 
 ## Backend Requirements
 
-Environment variables:
+### Required
 
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (recommended for backend function table access)
-- `ADMIN_API_KEY` (optional; used for protected save/delete operations)
-- `ADMIN_USERNAME` (optional, default: `admin`)
-- `ADMIN_PASSWORD` (recommended; if missing, fallback uses `ADMIN_API_KEY` then `SUPABASE_ANON_KEY`)
-- `ADMIN_TOKEN_SECRET` (optional; secret for signing admin session tokens)
-- `USER_TOKEN_SECRET` (optional; secret for signing customer session tokens)
+These have **no fallback**. If any is missing the affected endpoints return 500
+and log the reason. Earlier versions fell back to `SUPABASE_ANON_KEY`, which is a
+*publishable* credential — anyone holding it could sign admin tokens or log in as
+the administrator.
 
-If `ADMIN_API_KEY` is not set, the backend will automatically use `SUPABASE_ANON_KEY` as the admin key fallback.
+| Variable | Purpose |
+| --- | --- |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anon key |
+| `ADMIN_TOKEN_SECRET` | Signs admin session tokens |
+| `ADMIN_PASSWORD` | The administrator password |
+| `USER_TOKEN_SECRET` | Signs customer session tokens and password-reset tokens |
+
+Generate the two secrets with, for example:
+
+```
+openssl rand -base64 48
+```
+
+### Recommended
+
+| Variable | Purpose |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | Lets the functions read/write tables with RLS enabled |
+| `RESEND_API_KEY` | Transactional email; without it, emails are silently skipped |
+| `RESEND_FROM_EMAIL` | Sender address for those emails |
+| `ADMIN_NOTIFY_EMAIL` | Where new-booking notifications are sent |
+
+### Optional
+
+| Variable | Purpose |
+| --- | --- |
+| `ADMIN_USERNAME` | Defaults to `admin` |
+| `ADMIN_API_KEY` | Legacy `x-admin-key` header. Must now be set explicitly to work |
+| `ALLOWED_ORIGINS` | Comma-separated extra origins allowed to call the API. The deployment's own origin is always allowed |
+| `PASSWORD_HASH_ITERATIONS` | PBKDF2 iterations, default `210000`. Lower it only if you hit a Workers CPU limit |
+| `LEGACY_PASSWORD_SECRET` | See the upgrade note below |
+
+### Rate limiting (KV binding)
+
+Login, signup, password reset, booking lookup and booking submission are rate
+limited per IP. Bind a Workers KV namespace named `RATE_LIMIT` so the counters
+are shared across isolates:
+
+```
+npx wrangler kv namespace create RATE_LIMIT
+```
+
+then add the binding in the Pages project settings. **Without the binding the
+limiter still runs but keeps counts in each isolate's memory**, so a distributed
+attacker gets a higher effective ceiling. It is a mitigation, not a wall.
+
+## Upgrading an existing deployment
+
+Read this before deploying — two things change behaviour.
+
+**1. Everyone is signed out once.** Session tokens are now HMAC-signed rather
+than using the previous `SHA-256(payload + secret)` construction, so existing
+admin and customer tokens stop validating. Users simply sign in again.
+
+**2. Customer passwords keep working.** Stored passwords were an unsalted
+`SHA-256(password + secret)`. They are now PBKDF2-HMAC-SHA256 with a per-user
+random salt. Existing hashes are still accepted and are **transparently rewritten
+in the new format on the next successful login** — nobody has to reset anything.
+
+The one case that needs attention: if you previously had `USER_TOKEN_SECRET` set
+and you change its value now, old hashes can no longer be verified. Put the
+**previous** value in `LEGACY_PASSWORD_SECRET` so they still resolve and upgrade:
+
+```
+LEGACY_PASSWORD_SECRET=<the old USER_TOKEN_SECRET>
+```
+
+If you never set `USER_TOKEN_SECRET` before, no action is needed — the old hashes
+were keyed to `SUPABASE_ANON_KEY` and that is tried automatically.
+
+New PBKDF2 hashes do not depend on any environment secret, so this class of
+problem cannot recur: rotating token secrets will never again risk locking
+customers out.
 
 ## Supabase Table Setup
 
@@ -224,9 +293,29 @@ around the check-and-insert instead.
   only intended path to the data. Enable RLS on `public.bookings`, `public.app_users`
   and `public.system_config` so the anon key cannot read these tables directly
   through the Supabase REST endpoint.
+- **Passwords** are PBKDF2-HMAC-SHA256, 210,000 iterations, with a per-user random
+  salt. The algorithm, iteration count and salt are stored alongside each hash, so
+  the cost can be raised later without invalidating existing passwords.
+- **Session tokens** are HMAC-SHA256 signed and compared in constant time, as is
+  the administrator password.
+- **CORS** is same-origin by default. No endpoint sends
+  `Access-Control-Allow-Origin: *`; add extra origins via `ALLOWED_ORIGINS`.
+- **Rate limiting** covers login, signup, password reset, booking lookup and
+  booking submission. Bind the `RATE_LIMIT` KV namespace in production.
 - **Static security headers** are set in [_headers](_headers), including a
   Content-Security-Policy, `X-Frame-Options` and `Referrer-Policy`.
 - Database errors are logged server-side and never returned to the browser.
+
+### Still outstanding
+
+These are known and deliberately not yet addressed:
+
+- Session tokens are held in `localStorage`, so an XSS bug would expose them, and
+  they cannot be revoked before their 12-hour expiry. Moving to `httpOnly`
+  cookies plus a server-side revocation list is the fix.
+- There is a single administrator identity defined by environment variable, with
+  no per-admin accounts, roles, audit log or 2FA.
+- The concurrent-booking race described above.
 
 ## Tests
 

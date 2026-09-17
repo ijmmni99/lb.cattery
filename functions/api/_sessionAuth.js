@@ -1,66 +1,44 @@
-function toBase64Url(input) {
-  const base64 = btoa(input);
-  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+import { decodeBase64Url, encodeBase64Url, hmacSha256, timingSafeEqual } from "./_crypto.js";
+
+export { generateRandomToken, hashPassword, hashToken, verifyPassword } from "./_crypto.js";
+
+/**
+ * Secret used to sign customer session tokens.
+ *
+ * Returns "" when unset. It deliberately does NOT fall back to SUPABASE_ANON_KEY:
+ * the anon key is a publishable credential, so signing sessions with it meant
+ * anyone holding it could mint valid tokens. Callers must fail closed.
+ */
+export function getUserSecret(env) {
+  return env.USER_TOKEN_SECRET || "";
 }
 
-function fromBase64Url(input) {
-  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
-  return atob(base64 + pad);
-}
-
-async function sha256Base64Url(value) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const bytes = new Uint8Array(digest);
-  let str = "";
-  for (const byte of bytes) {
-    str += String.fromCharCode(byte);
-  }
-  return toBase64Url(str);
-}
-
-export async function hashPassword(password, secret) {
-  return sha256Base64Url(`${password}.${secret}`);
-}
-
-export async function hashValue(value, secret) {
-  return sha256Base64Url(`${value}.${secret}`);
-}
-
-export function generateRandomToken(byteLength = 24) {
-  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
-  let str = "";
-  for (const byte of bytes) {
-    str += String.fromCharCode(byte);
-  }
-  return toBase64Url(str);
+/**
+ * Candidate secrets that a pre-migration password hash may have been salted
+ * with. The old code fell back from USER_TOKEN_SECRET to SUPABASE_ANON_KEY, so
+ * a deployment that never set the former has hashes keyed to the latter. All
+ * candidates are tried when verifying a legacy hash, which is then upgraded.
+ */
+export function getLegacyPasswordSecrets(env) {
+  return [env.LEGACY_PASSWORD_SECRET, env.USER_TOKEN_SECRET, env.SUPABASE_ANON_KEY].filter(Boolean);
 }
 
 export async function createSessionToken(subject, secret, ttlMs = 12 * 60 * 60 * 1000, extra = {}) {
-  const payloadObj = {
-    sub: subject,
-    exp: Date.now() + ttlMs,
-    ...extra,
-  };
-  const payload = toBase64Url(JSON.stringify(payloadObj));
-  const signature = await sha256Base64Url(`${payload}.${secret}`);
-  return `${payload}.${signature}`;
+  const payload = encodeBase64Url(JSON.stringify({ sub: subject, exp: Date.now() + ttlMs, ...extra }));
+  return `${payload}.${await hmacSha256(payload, secret)}`;
 }
 
 export async function verifySessionToken(token, secret) {
   if (!token || !secret) return null;
+
   const parts = token.split(".");
   if (parts.length !== 2) return null;
 
   const [payload, signature] = parts;
-  const expectedSig = await sha256Base64Url(`${payload}.${secret}`);
-  if (signature !== expectedSig) return null;
+  if (!timingSafeEqual(signature, await hmacSha256(payload, secret))) return null;
 
   try {
-    const raw = fromBase64Url(payload);
-    const decoded = JSON.parse(raw);
+    const decoded = JSON.parse(decodeBase64Url(payload));
     if (!decoded.exp || Number(decoded.exp) < Date.now()) return null;
     return decoded;
   } catch {
@@ -74,9 +52,7 @@ export function getTokenFromRequest(request, headerName = "x-user-token") {
 
   const authHeader = request.headers.get("authorization") || "";
   const [scheme, token] = authHeader.split(" ");
-  if (scheme?.toLowerCase() === "bearer" && token) {
-    return token;
-  }
+  if (scheme?.toLowerCase() === "bearer" && token) return token;
 
   return "";
 }

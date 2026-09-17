@@ -50,17 +50,11 @@ function setBookingsStatus(message, ok) {
   bookingsStatus.classList.add(ok ? "ok" : "warn");
 }
 
+// The API returns a single user-facing `error` string; internal database detail
+// is logged server-side and deliberately never sent to the browser.
 function extractApiErrorMessage(data, fallback) {
   if (!data || typeof data !== "object") return fallback;
-  const parts = [];
-  if (data.error) parts.push(String(data.error));
-  if (data.hint) parts.push(`Hint: ${String(data.hint)}`);
-  if (data.status) parts.push(`Status: ${String(data.status)}`);
-  if (data.detail) {
-    const detailText = String(data.detail).replace(/\s+/g, " ").trim();
-    if (detailText) parts.push(`Detail: ${detailText.slice(0, 220)}`);
-  }
-  return parts.length ? parts.join(" | ") : fallback;
+  return data.error ? String(data.error) : fallback;
 }
 
 function setMode(mode) {

@@ -1,58 +1,67 @@
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+import { httpContext } from "./_http.js";
+import { clientIp, enforceRateLimit } from "./_rateLimit.js";
+import { getRestAuth } from "./_settings.js";
+
+const HTTP_OPTIONS = { methods: "POST, OPTIONS", allowHeaders: "Content-Type" };
+
+const SELECT_COLUMNS = [
+  "id", "owner_name", "owner_email", "owner_phone",
+  "cats", "cat_name", "breed", "age",
+  "suite_type", "check_in", "check_out",
+  "add_ons", "add_on", "total_price", "notes", "status",
+].join(",");
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
 export async function onRequest({ request, env }) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS });
+  const http = httpContext(request, env, HTTP_OPTIONS);
+
+  if (request.method === "OPTIONS") return http.preflight();
+  if (request.method !== "POST") return http.json({ error: "Not found" }, 404);
+
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+    return http.json({ error: "Service unavailable" }, 500);
   }
 
-  if (request.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: CORS });
-  }
-
-  const { SUPABASE_URL, SUPABASE_ANON_KEY } = env;
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return new Response(JSON.stringify({ error: "Missing Supabase env vars" }), { status: 500, headers: CORS });
-  }
+  // A booking id plus an email is a weak secret, so cap guessing attempts.
+  const limited = await enforceRateLimit(env, http, {
+    key: `booking-lookup:${clientIp(request)}`,
+    limit: 20,
+    windowSeconds: 15 * 60,
+    message: "Too many lookups. Please wait a few minutes and try again.",
+  });
+  if (limited) return limited;
 
   const body = await request.json().catch(() => null);
-  const bookingId = String(body?.bookingId || "").trim();
-  const email = normalizeEmail(body?.email);
+  const bookingId = String(body?.bookingId || "").trim().slice(0, 100);
+  const email = normalizeEmail(body?.email).slice(0, 320);
 
   if (!bookingId || !email) {
-    return new Response(JSON.stringify({ error: "Booking ID and email are required" }), { status: 400, headers: CORS });
+    return http.json({ error: "Booking ID and email are required" }, 400);
   }
 
-  const base = `${SUPABASE_URL}/rest/v1/bookings`;
-  const auth = {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-    "Content-Type": "application/json",
-  };
+  const query = [
+    `id=eq.${encodeURIComponent(bookingId)}`,
+    `owner_email=eq.${encodeURIComponent(email)}`,
+    `select=${SELECT_COLUMNS}`,
+    "limit=1",
+  ].join("&");
 
-  const res = await fetch(
-    `${base}?id=eq.${encodeURIComponent(bookingId)}&owner_email=eq.${encodeURIComponent(email)}&select=id,owner_name,owner_email,owner_phone,cats,cat_name,breed,age,suite_type,check_in,check_out,add_ons,add_on,total_price,notes,status&limit=1`,
-    { headers: auth },
-  );
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/bookings?${query}`, { headers: getRestAuth(env) });
 
   if (!res.ok) {
-    return new Response(JSON.stringify({ error: "Failed to look up booking" }), { status: 500, headers: CORS });
+    console.error("booking lookup failed", res.status, await res.text().catch(() => ""));
+    return http.json({ error: "Could not look up that booking. Please try again." }, 500);
   }
 
-  const rows = await res.json();
+  const rows = await res.json().catch(() => []);
   const booking = Array.isArray(rows) ? rows[0] : null;
 
   if (!booking) {
-    return new Response(JSON.stringify({ error: "No booking found matching that ID and email" }), { status: 404, headers: CORS });
+    return http.json({ error: "No booking found matching that ID and email" }, 404);
   }
 
-  return new Response(JSON.stringify(booking), { headers: CORS });
+  return http.json(booking);
 }

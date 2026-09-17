@@ -1,54 +1,53 @@
-import { getTokenFromRequest, verifySessionToken } from "./_sessionAuth.js";
+import { httpContext } from "./_http.js";
+import { getRestAuth } from "./_settings.js";
+import { getTokenFromRequest, getUserSecret, verifySessionToken } from "./_sessionAuth.js";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, x-user-token, authorization",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Content-Type": "application/json",
+const HTTP_OPTIONS = {
+  methods: "GET, OPTIONS",
+  allowHeaders: "Content-Type, x-user-token, authorization",
 };
 
-function getUserSecret(env) {
-  return env.USER_TOKEN_SECRET || env.SUPABASE_ANON_KEY || "";
-}
+const SELECT_COLUMNS = [
+  "id", "owner_name", "owner_email", "owner_phone",
+  "cats", "cat_name", "breed", "age",
+  "suite_type", "check_in", "check_out",
+  "add_ons", "add_on", "total_price", "notes", "status",
+].join(",");
 
 export async function onRequest({ request, env }) {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS });
-  }
+  const http = httpContext(request, env, HTTP_OPTIONS);
 
-  if (request.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: CORS });
-  }
+  if (request.method === "OPTIONS") return http.preflight();
+  if (request.method !== "GET") return http.json({ error: "Not found" }, 404);
 
   if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-    return new Response(JSON.stringify({ error: "Missing Supabase env vars" }), { status: 500, headers: CORS });
+    return http.json({ error: "Service unavailable" }, 500);
   }
 
-  const token = getTokenFromRequest(request, "x-user-token");
-  const payload = await verifySessionToken(token, getUserSecret(env));
+  const userSecret = getUserSecret(env);
+  if (!userSecret) {
+    console.error("Customer auth is not configured: set USER_TOKEN_SECRET.");
+    return http.json({ error: "Customer accounts are not configured." }, 500);
+  }
+
+  const payload = await verifySessionToken(getTokenFromRequest(request, "x-user-token"), userSecret);
   const email = String(payload?.sub || "").trim().toLowerCase();
-
   if (!email) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: CORS });
+    return http.json({ error: "Unauthorized" }, 401);
   }
 
-  const base = `${env.SUPABASE_URL}/rest/v1/bookings`;
-  const restKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
-  const auth = {
-    apikey: restKey,
-    Authorization: `Bearer ${restKey}`,
-    "Content-Type": "application/json",
-  };
+  const query = [
+    `owner_email=eq.${encodeURIComponent(email)}`,
+    `select=${SELECT_COLUMNS}`,
+    "order=check_in.asc",
+  ].join("&");
 
-  const res = await fetch(
-    `${base}?owner_email=eq.${encodeURIComponent(email)}&select=id,owner_name,owner_email,owner_phone,cats,cat_name,breed,age,suite_type,check_in,check_out,add_ons,add_on,total_price,notes,status&order=check_in.asc`,
-    { headers: auth },
-  );
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/bookings?${query}`, { headers: getRestAuth(env) });
 
   if (!res.ok) {
-    return new Response(JSON.stringify({ error: "Failed to load bookings" }), { status: 500, headers: CORS });
+    console.error("user bookings query failed", res.status, await res.text().catch(() => ""));
+    return http.json({ error: "Failed to load bookings" }, 500);
   }
 
-  const rows = await res.json();
-  return new Response(JSON.stringify(rows), { headers: CORS });
+  return http.json(await res.json());
 }
