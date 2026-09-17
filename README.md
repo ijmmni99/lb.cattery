@@ -83,7 +83,14 @@ attacker gets a higher effective ceiling. It is a mitigation, not a wall.
 
 ## Upgrading an existing deployment
 
-Read this before deploying — two things change behaviour.
+Read this before deploying — three things change behaviour.
+
+**0. Deploy the Functions BEFORE locking down the database.** The previous
+Functions authenticated some queries with the anon key; the new ones use the
+service role key throughout. `db/001_post_deploy_revoke_anon_bookings.sql`
+removes anon access to `public.bookings` and must therefore run *after* the
+deploy, not before. See [db/README.md](db/README.md) for the exact order and the
+rollback script.
 
 **1. Everyone is signed out once.** Session tokens are now HMAC-signed rather
 than using the previous `SHA-256(payload + secret)` construction, so existing
@@ -264,6 +271,14 @@ A suite's `capacity` is the number of **cat slots** it holds, not the number of
 bookings. This matches pricing, which is `nightlyRate x nights x number of cats`.
 A Standard Suite with `capacity: 6` accepts any combination of bookings totalling
 six cats on a given night.
+
+> **Check your capacity numbers against this model.** The previous code counted
+> *bookings* against `capacity`, so a suite with `capacity: 3` accepted three
+> bookings of any size. Under the cat-slot model the same number means three
+> cats. Any suite whose configured capacity is lower than the most cats it has
+> actually held at once will start refusing bookings it used to accept, and will
+> show those dates as full in the calendar. Review the values in Admin → Suites
+> before or immediately after deploying.
 
 ### Known limitation: concurrent booking race
 
