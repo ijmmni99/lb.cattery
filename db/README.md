@@ -20,8 +20,12 @@ through the Supabase REST endpoint.
 
 Deploy order matters:
 
+0. Set the required environment variables on the Pages project first
+   (`ADMIN_TOKEN_SECRET`, `ADMIN_PASSWORD`, `USER_TOKEN_SECRET`). The new code
+   fails closed without them.
 1. Deploy the new Functions (they use the service role key for every query).
-2. Confirm the site loads, a booking can be submitted, and the admin list works.
+2. Check `GET /api/health` returns `{"ok": true}`, then confirm the site loads,
+   a booking can be submitted, and the admin list works.
 3. Run `001_post_deploy_revoke_anon_bookings.sql`.
 4. Re-confirm the same three things.
 

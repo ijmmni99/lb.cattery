@@ -266,3 +266,38 @@ test("extra origins can be allowlisted explicitly", async () => {
   });
   assert.equal(denied.headers.get("Access-Control-Allow-Origin"), null);
 });
+
+// --- Configuration self-check ---
+
+test("health reports missing required config without leaking values", async () => {
+  const { onRequest: health } = await import("../functions/api/health.js");
+
+  const { ADMIN_PASSWORD, USER_TOKEN_SECRET, ...partial } = BASE_ENV;
+  const res = await health({ env: partial, request: req("/api/health", { method: "GET" }) });
+  assert.equal(res.status, 503);
+
+  const body = await res.json();
+  assert.equal(body.ok, false);
+  assert.deepEqual(body.missing.sort(), ["adminPassword", "userTokenSecret"]);
+  // The public booking flow does not depend on those secrets.
+  assert.equal(body.publicBookingOk, true);
+
+  // No secret values anywhere in the response.
+  const serialised = JSON.stringify(body);
+  for (const secret of Object.values(BASE_ENV)) {
+    assert.equal(serialised.includes(secret), false, `leaked ${secret}`);
+  }
+});
+
+test("health reports ok when everything required is present", async () => {
+  const { onRequest: health } = await import("../functions/api/health.js");
+
+  const res = await health({ env: BASE_ENV, request: req("/api/health", { method: "GET" }) });
+  assert.equal(res.status, 200);
+
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.missing, []);
+  assert.equal(body.optional.rateLimitStore, "memory");
+  assert.ok(body.warnings.some((w) => w.includes("RATE_LIMIT")));
+});

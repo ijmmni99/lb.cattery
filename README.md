@@ -227,6 +227,9 @@ alter table public.bookings
   and calendar. Returns only `{ suiteType, checkIn, checkOut, cats }` per occupied
   stay — no names, emails, phone numbers or notes. Accepts optional `from` and
   `to` (`YYYY-MM-DD`) to narrow the window.
+- `GET /api/health`: configuration self-check. Returns 200 when every required
+  variable is present, 503 listing which are missing. Reports presence only,
+  never values. Use it to verify a deploy.
 - `GET /api/settings`: public read of current settings
 - `POST /api/settings`: admin-only write
 - `GET /api/bookings`: **admin-only** read of full booking records
