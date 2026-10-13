@@ -27,5 +27,11 @@
   Cache-Control: public, max-age=86400
   Content-Type: application/manifest+json
 
+/admin.html
+  X-Robots-Tag: noindex, nofollow
+
+/offline.html
+  X-Robots-Tag: noindex
+
 /api/*
   Cache-Control: no-store

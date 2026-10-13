@@ -182,6 +182,14 @@ async function getSettings() {
   return normalizeSettings(data);
 }
 
+// Mirrors sanitizeUrl on the server: http(s) or relative paths only.
+function safeUrl(value) {
+  const url = String(value || "").trim();
+  if (/^https?:\/\/[^\s]+$/i.test(url)) return url;
+  if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url) && !url.startsWith("//") && !/\s/.test(url)) return url;
+  return "";
+}
+
 function normalizeSettings(raw) {
   const safe = raw && typeof raw === "object" ? raw : {};
   const booking = safe.booking && typeof safe.booking === "object" ? safe.booking : {};
@@ -206,7 +214,7 @@ function normalizeSettings(raw) {
         name: String(suite.name || "").trim(),
         nightlyRate: Number(suite.nightlyRate) || 0,
         capacity: Math.max(1, Number(suite.capacity) || 1),
-        imageUrl: String(suite.imageUrl || "").trim(),
+        imageUrl: safeUrl(suite.imageUrl),
         active: suite.active !== false,
       }))
       .filter((suite) => suite.code && suite.name),
@@ -221,9 +229,9 @@ function normalizeSettings(raw) {
       .filter((addon) => addon.code && addon.name),
     promos: promos
       .map((promo) => ({
-        imageUrl: String(promo.imageUrl || "").trim(),
+        imageUrl: safeUrl(promo.imageUrl),
         caption: String(promo.caption || "").trim(),
-        linkUrl: String(promo.linkUrl || "").trim(),
+        linkUrl: safeUrl(promo.linkUrl),
         active: promo.active !== false,
       }))
       .filter((promo) => promo.imageUrl && promo.active),
@@ -459,10 +467,13 @@ function createCatRow() {
       </label>
       <label>
         Vaccination date (optional)
-        <input type="date" name="vaccinationDate[]" max="${todayIso()}" />
+        <input type="date" name="vaccinationDate[]" />
       </label>
     </div>
   `;
+
+  // Static markup above; the only dynamic value is set through the DOM.
+  fields.querySelector('input[name="vaccinationDate[]"]').max = todayIso();
 
   row.append(header, fields);
   return row;

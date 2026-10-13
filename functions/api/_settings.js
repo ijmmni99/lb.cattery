@@ -22,6 +22,14 @@ export const DEFAULT_SETTINGS = {
   },
 };
 
+// Only http(s) URLs or plain relative paths; blocks javascript:, data: and protocol-relative URLs.
+export function sanitizeUrl(value) {
+  const url = String(value || "").trim().slice(0, 2000);
+  if (/^https?:\/\/[^\s]+$/i.test(url)) return url;
+  if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url) && !url.startsWith("//") && !/\s/.test(url)) return url;
+  return "";
+}
+
 export function sanitizeSettings(input) {
   const safe = input && typeof input === "object" ? input : {};
   const booking = safe.booking && typeof safe.booking === "object" ? safe.booking : {};
@@ -47,7 +55,7 @@ export function sanitizeSettings(input) {
         name: String(suite.name || "").trim(),
         nightlyRate: Number(suite.nightlyRate) || 0,
         capacity: Math.max(1, Number(suite.capacity) || 1),
-        imageUrl: String(suite.imageUrl || "").trim().slice(0, 2000),
+        imageUrl: sanitizeUrl(suite.imageUrl),
         active: suite.active !== false,
       }))
       .filter((suite) => suite.code && suite.name),
@@ -62,9 +70,9 @@ export function sanitizeSettings(input) {
       .filter((addon) => addon.code && addon.name),
     promos: promos
       .map((promo) => ({
-        imageUrl: String(promo.imageUrl || "").trim().slice(0, 2000),
+        imageUrl: sanitizeUrl(promo.imageUrl),
         caption: String(promo.caption || "").trim().slice(0, 200),
-        linkUrl: String(promo.linkUrl || "").trim().slice(0, 2000),
+        linkUrl: sanitizeUrl(promo.linkUrl),
         active: promo.active !== false,
       }))
       .filter((promo) => promo.imageUrl),
