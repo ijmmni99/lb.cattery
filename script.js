@@ -15,6 +15,9 @@ const DEFAULT_SETTINGS = {
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
   ],
   promos: [],
+  contact: {
+    whatsappNumber: "",
+  },
 };
 
 const bookingForm = document.getElementById("booking-form");
@@ -32,7 +35,6 @@ const promoPrevBtn = document.getElementById("promo-prev");
 const promoNextBtn = document.getElementById("promo-next");
 const calendarTitleEl = document.getElementById("calendar-title");
 const calendarEl = document.getElementById("availability-calendar");
-const calendarPopover = document.getElementById("calendar-popover");
 const calPrevBtn = document.getElementById("cal-prev");
 const calNextBtn = document.getElementById("cal-next");
 const formModeEl = document.getElementById("form-mode");
@@ -48,8 +50,11 @@ const stepBackBtn = document.getElementById("step-back");
 const stepNextBtn = document.getElementById("step-next");
 const submitBookingBtn = document.getElementById("submit-booking");
 const bookingSummaryEl = document.getElementById("booking-summary");
+const formErrorsEl = document.getElementById("form-errors");
+const bookingCardEl = document.getElementById("booking-card");
+const confirmationEl = document.getElementById("booking-confirmation");
 
-const STEP_LABELS = ["Suite & Dates", "Cat Details", "Contact Info", "Review & Confirm"];
+const STEP_LABELS = ["Your stay", "Contact & confirm"];
 let currentStep = 0;
 
 const calendarState = {
@@ -58,7 +63,10 @@ const calendarState = {
 };
 
 let calendarBookingsCache = [];
-let activeCalendarDay = null;
+let calendarReady = false;
+
+// Check-in / check-out picked by clicking the calendar.
+const dateSelection = { start: null, end: null };
 
 let promoSlides = [];
 let promoIndex = 0;
@@ -181,8 +189,12 @@ function normalizeSettings(raw) {
   const suites = Array.isArray(safe.suites) ? safe.suites : DEFAULT_SETTINGS.suites;
   const addons = Array.isArray(safe.addons) ? safe.addons : DEFAULT_SETTINGS.addons;
   const promos = Array.isArray(safe.promos) ? safe.promos : DEFAULT_SETTINGS.promos;
+  const contact = safe.contact && typeof safe.contact === "object" ? safe.contact : {};
 
   return {
+    contact: {
+      whatsappNumber: String(contact.whatsappNumber || "").replace(/\D/g, ""),
+    },
     booking: {
       allowPublicBooking: booking.allowPublicBooking !== false,
       minNights: Number(booking.minNights) > 0 ? Number(booking.minNights) : 1,
@@ -372,7 +384,10 @@ function updateSuiteCardSelection() {
 }
 
 bookingForm.addEventListener("change", (event) => {
-  if (event.target.name === "suiteType") updateSuiteCardSelection();
+  if (event.target.name !== "suiteType") return;
+  updateSuiteCardSelection();
+  availabilitySuite.value = event.target.value;
+  if (calendarReady) paintCalendar();
 });
 
 function renderSelectOptions() {
@@ -437,6 +452,16 @@ function createCatRow() {
       Age (years)
       <input type="number" name="age[]" min="0" max="30" step="0.5" required />
     </label>
+    <div class="vaccination-fields">
+      <label class="check-inline">
+        <input type="checkbox" name="vaccinated[]" />
+        Vaccination up to date
+      </label>
+      <label>
+        Vaccination date (optional)
+        <input type="date" name="vaccinationDate[]" max="${todayIso()}" />
+      </label>
+    </div>
   `;
 
   row.append(header, fields);
@@ -450,6 +475,8 @@ function updateCatRowChrome() {
     const removeBtn = row.querySelector(".remove-cat-btn");
     removeBtn.hidden = rows.length <= 1;
   });
+  // Cat count changes which days still have room.
+  if (calendarReady) paintCalendar();
 }
 
 function addCatRow() {
@@ -463,10 +490,13 @@ function resetCatRows() {
 }
 
 function collectCats() {
-  const names = Array.from(catRowsEl.querySelectorAll('input[name="catName[]"]')).map((el) => el.value.trim());
-  const breeds = Array.from(catRowsEl.querySelectorAll('input[name="breed[]"]')).map((el) => el.value.trim());
-  const ages = Array.from(catRowsEl.querySelectorAll('input[name="age[]"]')).map((el) => el.value);
-  return names.map((name, index) => ({ name, breed: breeds[index] || "", age: ages[index] || "" }));
+  return Array.from(catRowsEl.querySelectorAll(".cat-card")).map((row) => ({
+    name: row.querySelector('input[name="catName[]"]').value.trim(),
+    breed: row.querySelector('input[name="breed[]"]').value.trim(),
+    age: row.querySelector('input[name="age[]"]').value,
+    vaccinated: row.querySelector('input[name="vaccinated[]"]').checked,
+    vaccinationDate: row.querySelector('input[name="vaccinationDate[]"]').value,
+  }));
 }
 
 function collectAddOns() {
@@ -488,14 +518,6 @@ function formatAddonFee(addon) {
     return `+${formatMoney(nightlyFee)}/night`;
   }
   return "no extra fee";
-}
-
-function datesOverlap(aStart, aEnd, bStart, bEnd) {
-  const startA = parseDate(aStart);
-  const endA = parseDate(aEnd);
-  const startB = parseDate(bStart);
-  const endB = parseDate(bEnd);
-  return startA < endB && endA > startB;
 }
 
 function catsOnNight(dateIso, suiteType, allBookings) {
@@ -547,16 +569,32 @@ function isoDateFromParts(year, month, day) {
   return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
-function bookingCountForDate(dateIso, suiteType, allBookings) {
-  return catsOnNight(dateIso, suiteType, allBookings);
+function todayIso() {
+  const now = new Date();
+  return isoDateFromParts(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-function dayClassByCount(count, suiteType) {
-  const suiteCapacity = getSuiteCapacityMap();
-  const cap = suiteCapacity[suiteType] || 1;
-  if (count >= cap) return "full";
-  if (count > 0) return "limited";
-  return "available";
+function formCatCount() {
+  return Math.max(1, collectCats().length);
+}
+
+function isNightFree(dateIso, suiteType, bookings, newCats) {
+  const capacity = getSuiteCapacityMap()[suiteType] || 1;
+  return catsOnNight(dateIso, suiteType, bookings) + newCats <= capacity;
+}
+
+// A day is disabled when it is in the past or full. While waiting for a check-out, days after the check-in
+// stay enabled only if every night in between is free (so a full day can still be a check-out day).
+function isCalendarDayDisabled(dateIso, suiteType, bookings) {
+  if (dateIso < todayIso()) return true;
+  const newCats = formCatCount();
+  const awaitingEnd = dateSelection.start && !dateSelection.end;
+  if (awaitingEnd && dateIso > dateSelection.start) {
+    const nights = eachNightIso(dateSelection.start, dateIso);
+    if (nights.length > settings.booking.maxNights) return true;
+    return !nights.every((night) => isNightFree(night, suiteType, bookings, newCats));
+  }
+  return !isNightFree(dateIso, suiteType, bookings, newCats);
 }
 
 function showCalendarSkeleton() {
@@ -570,15 +608,13 @@ function showCalendarSkeleton() {
   }
 }
 
-async function renderAvailabilityCalendar() {
+function paintCalendar() {
   const suiteType = availabilitySuite.value;
   const { year, month } = calendarState;
   const { start, end } = getMonthBounds(year, month);
   const firstWeekday = start.getDay();
   const daysInMonth = end.getDate();
-  const allBookings = await loadBookings();
-  calendarBookingsCache = allBookings;
-  closeCalendarPopover();
+  const allBookings = calendarBookingsCache;
 
   calendarTitleEl.textContent = new Intl.DateTimeFormat("en-MY", {
     month: "long",
@@ -588,8 +624,7 @@ async function renderAvailabilityCalendar() {
   calendarEl.classList.remove("is-loading");
   calendarEl.setAttribute("aria-busy", "false");
   calendarEl.innerHTML = "";
-  const weekdayNames = ["S", "M", "T", "W", "T", "F", "S"];
-  weekdayNames.forEach((day) => {
+  ["S", "M", "T", "W", "T", "F", "S"].forEach((day) => {
     const el = document.createElement("div");
     el.className = "calendar-head";
     el.textContent = day;
@@ -605,16 +640,26 @@ async function renderAvailabilityCalendar() {
   for (let day = 1; day <= daysInMonth; day += 1) {
     const isoDate = isoDateFromParts(year, month, day);
     const count = bookingCountForDate(isoDate, suiteType, allBookings);
+    const disabled = isCalendarDayDisabled(isoDate, suiteType, allBookings);
+    const isStart = isoDate === dateSelection.start;
+    const isEnd = isoDate === dateSelection.end;
+    const inRange = dateSelection.start && dateSelection.end && isoDate > dateSelection.start && isoDate < dateSelection.end;
 
     const dayEl = document.createElement("button");
     dayEl.type = "button";
     dayEl.className = `calendar-day ${dayClassByCount(count, suiteType)}`;
+    if (isStart) dayEl.classList.add("sel-start");
+    if (isEnd) dayEl.classList.add("sel-end");
+    if (inRange) dayEl.classList.add("sel-range");
     dayEl.dataset.date = isoDate;
-    dayEl.setAttribute("aria-haspopup", "dialog");
-    dayEl.setAttribute(
-      "aria-label",
-      `${formatDateLong(isoDate)}: ${count > 0 ? `${count} cat${count > 1 ? "s" : ""} booked` : "no bookings"}. Tap for summary.`,
-    );
+    dayEl.disabled = disabled;
+    dayEl.setAttribute("aria-pressed", isStart || isEnd ? "true" : "false");
+
+    const parts = [formatDateLong(isoDate), count > 0 ? `${count} cat${count > 1 ? "s" : ""} booked` : "no bookings"];
+    if (isStart) parts.push("check-in");
+    if (isEnd) parts.push("check-out");
+    if (disabled) parts.push("not available");
+    dayEl.setAttribute("aria-label", parts.join(", "));
 
     const dayNum = document.createElement("strong");
     dayNum.textContent = String(day);
@@ -627,6 +672,81 @@ async function renderAvailabilityCalendar() {
   }
 }
 
+async function renderAvailabilityCalendar() {
+  calendarBookingsCache = await loadBookings();
+  calendarReady = true;
+  paintCalendar();
+}
+
+function setBookingFormDates(start, end) {
+  bookingForm.elements.checkIn.value = start || "";
+  bookingForm.elements.checkOut.value = end || "";
+  availabilityStart.value = start || "";
+  availabilityEnd.value = end || "";
+  refreshEstimate();
+}
+
+function scrollToBookingForm() {
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  bookingCardEl.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  bookingCardEl.focus({ preventScroll: true });
+}
+
+function handleCalendarDayClick(dateIso) {
+  const { start, end } = dateSelection;
+
+  if (!start || end || dateIso <= start) {
+    dateSelection.start = dateIso;
+    dateSelection.end = null;
+    setBookingFormDates(dateIso, "");
+    showAvailabilityMessage(`Check-in set to ${formatDateLong(dateIso)}. Now pick your check-out day.`, true);
+    paintCalendar();
+    return;
+  }
+
+  const nights = daysBetween(start, dateIso);
+  if (nights < settings.booking.minNights) {
+    showAvailabilityMessage(`Minimum stay is ${settings.booking.minNights} night(s). Pick a later check-out day.`, false);
+    return;
+  }
+
+  dateSelection.end = dateIso;
+  setBookingFormDates(start, dateIso);
+  showAvailabilityMessage(`${formatDateLong(start)} to ${formatDateLong(dateIso)} (${nights} night${nights === 1 ? "" : "s"}). Fill in the booking form below.`, true);
+  paintCalendar();
+  scrollToBookingForm();
+}
+
+calendarEl.addEventListener("click", (event) => {
+  const dayEl = event.target.closest(".calendar-day:not(.empty):not(:disabled)");
+  if (!dayEl?.dataset.date) return;
+  handleCalendarDayClick(dayEl.dataset.date);
+});
+
+// Keep the calendar selection in step with dates typed into either date form.
+function syncSelectionFromInputs(start, end) {
+  dateSelection.start = start || null;
+  dateSelection.end = start && end && end > start ? end : null;
+  if (calendarReady) paintCalendar();
+}
+
+bookingForm.elements.checkIn.addEventListener("change", () => {
+  availabilityStart.value = bookingForm.elements.checkIn.value;
+  syncSelectionFromInputs(bookingForm.elements.checkIn.value, bookingForm.elements.checkOut.value);
+});
+bookingForm.elements.checkOut.addEventListener("change", () => {
+  availabilityEnd.value = bookingForm.elements.checkOut.value;
+  syncSelectionFromInputs(bookingForm.elements.checkIn.value, bookingForm.elements.checkOut.value);
+});
+availabilityStart.addEventListener("change", () => {
+  bookingForm.elements.checkIn.value = availabilityStart.value;
+  syncSelectionFromInputs(availabilityStart.value, availabilityEnd.value);
+});
+availabilityEnd.addEventListener("change", () => {
+  bookingForm.elements.checkOut.value = availabilityEnd.value;
+  syncSelectionFromInputs(availabilityStart.value, availabilityEnd.value);
+});
+
 function formatDateLong(dateIso) {
   return new Intl.DateTimeFormat("en-MY", {
     weekday: "short",
@@ -634,130 +754,6 @@ function formatDateLong(dateIso) {
     month: "long",
     year: "numeric",
   }).format(parseDate(dateIso));
-}
-
-function bookingsSummaryForDate(dateIso, allBookings) {
-  const matches = allBookings.filter((booking) => dateIso >= booking.checkIn && dateIso < booking.checkOut);
-  const bySuite = new Map();
-  let total = 0;
-  matches.forEach((booking) => {
-    const suite = suiteByCode(booking.suiteType);
-    const label = suite ? suite.name : booking.suiteType;
-    bySuite.set(label, (bySuite.get(label) || 0) + booking.catCount);
-    total += booking.catCount;
-  });
-  return { total, bySuite };
-}
-
-function closeCalendarPopover() {
-  if (!calendarPopover) return;
-  calendarPopover.hidden = true;
-  calendarPopover.innerHTML = "";
-  if (activeCalendarDay) {
-    activeCalendarDay.classList.remove("day-active");
-    activeCalendarDay = null;
-  }
-}
-
-function positionCalendarPopover(anchorEl) {
-  const rect = anchorEl.getBoundingClientRect();
-  const popRect = calendarPopover.getBoundingClientRect();
-  let left = rect.left + rect.width / 2 - popRect.width / 2;
-  left = Math.max(8, Math.min(left, window.innerWidth - popRect.width - 8));
-  let top = rect.bottom + 8;
-  if (top + popRect.height > window.innerHeight - 8) {
-    top = rect.top - popRect.height - 8;
-  }
-  calendarPopover.style.left = `${left}px`;
-  calendarPopover.style.top = `${top}px`;
-}
-
-function renderCalendarPopover(dateIso, anchorEl) {
-  const { total, bySuite } = bookingsSummaryForDate(dateIso, calendarBookingsCache);
-  calendarPopover.innerHTML = "";
-
-  const closeBtn = document.createElement("button");
-  closeBtn.type = "button";
-  closeBtn.className = "popover-close";
-  closeBtn.setAttribute("aria-label", "Close");
-  closeBtn.textContent = "×";
-  closeBtn.addEventListener("click", closeCalendarPopover);
-
-  const heading = document.createElement("h4");
-  heading.textContent = formatDateLong(dateIso);
-
-  calendarPopover.append(closeBtn, heading);
-
-  if (total === 0) {
-    const empty = document.createElement("p");
-    empty.className = "popover-empty";
-    empty.textContent = "No bookings on this date.";
-    calendarPopover.appendChild(empty);
-  } else {
-    const summaryLine = document.createElement("p");
-    summaryLine.className = "popover-total";
-    summaryLine.textContent = `${total} cat${total > 1 ? "s" : ""} booked`;
-
-    const list = document.createElement("ul");
-    bySuite.forEach((count, label) => {
-      const li = document.createElement("li");
-      const name = document.createElement("span");
-      name.textContent = label;
-      const num = document.createElement("span");
-      num.textContent = `${count} cat${count > 1 ? "s" : ""}`;
-      li.append(name, num);
-      list.appendChild(li);
-    });
-
-    calendarPopover.append(summaryLine, list);
-  }
-
-  calendarPopover.hidden = false;
-  positionCalendarPopover(anchorEl);
-}
-
-function toggleCalendarPopover(dayEl) {
-  const dateIso = dayEl.dataset.date;
-  if (!dateIso) return;
-  if (activeCalendarDay === dayEl && !calendarPopover.hidden) {
-    closeCalendarPopover();
-    return;
-  }
-  if (activeCalendarDay) activeCalendarDay.classList.remove("day-active");
-  activeCalendarDay = dayEl;
-  dayEl.classList.add("day-active");
-  renderCalendarPopover(dateIso, dayEl);
-}
-
-if (calendarEl && calendarPopover) {
-  calendarEl.addEventListener("click", (event) => {
-    const dayEl = event.target.closest(".calendar-day:not(.empty)");
-    if (!dayEl) return;
-    toggleCalendarPopover(dayEl);
-  });
-
-  document.addEventListener("click", (event) => {
-    if (calendarPopover.hidden) return;
-    const target = event.target;
-    if (calendarPopover.contains(target) || (activeCalendarDay && activeCalendarDay.contains(target))) return;
-    closeCalendarPopover();
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !calendarPopover.hidden) closeCalendarPopover();
-  });
-
-  window.addEventListener("resize", () => {
-    if (!calendarPopover.hidden && activeCalendarDay) positionCalendarPopover(activeCalendarDay);
-  });
-
-  window.addEventListener(
-    "scroll",
-    () => {
-      if (!calendarPopover.hidden) closeCalendarPopover();
-    },
-    { capture: true, passive: true },
-  );
 }
 
 function refreshEstimate() {
@@ -786,39 +782,83 @@ function applyBookingStatus() {
     : "Bookings are temporarily closed. Please contact the administrator.";
 }
 
-function validateStepFields(index) {
-  const inputs = stepEls[index].querySelectorAll("input, select, textarea");
-  for (const el of inputs) {
-    if (!el.reportValidity()) {
-      return false;
-    }
+function fieldLabel(el) {
+  const catTitle = el.closest(".cat-card")?.querySelector(".cat-card-header strong")?.textContent;
+  let label = "";
+  if (el.type === "radio") {
+    label = el.closest(".suite-field")?.querySelector(".suite-field-label")?.textContent || "Suite type";
+  } else {
+    const wrapper = el.closest("label");
+    label = wrapper ? Array.from(wrapper.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join(" ") : "";
   }
-  return true;
+  label = label.replace(/\s+/g, " ").trim() || el.name || "Field";
+  return catTitle ? `${catTitle} – ${label}` : label;
+}
+
+function clearFormErrors() {
+  formErrorsEl.textContent = "";
+  bookingForm.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
+}
+
+// Lists messages in the aria-live region and moves focus to the offending field (or the region itself).
+function showFormErrors(messages, focusEl = null) {
+  formErrorsEl.textContent = "";
+  const list = document.createElement("ul");
+  messages.forEach((message) => {
+    const li = document.createElement("li");
+    li.textContent = message;
+    list.appendChild(li);
+  });
+  formErrorsEl.appendChild(list);
+  (focusEl || formErrorsEl).focus();
+}
+
+function validateStepFields(index) {
+  clearFormErrors();
+  const invalid = [];
+  const seenGroups = new Set();
+  stepEls[index].querySelectorAll("input, select, textarea").forEach((el) => {
+    if (el.disabled || el.checkValidity()) return;
+    if (el.type === "radio") {
+      if (seenGroups.has(el.name)) return;
+      seenGroups.add(el.name);
+    }
+    invalid.push(el);
+  });
+  if (!invalid.length) return true;
+
+  invalid.forEach((el) => el.setAttribute("aria-invalid", "true"));
+  showFormErrors(invalid.map((el) => `${fieldLabel(el)}: ${el.validationMessage}`), invalid[0]);
+  return false;
 }
 
 async function validateBookingRules() {
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
+  const checkOutInput = bookingForm.elements.checkOut;
   const nights = daysBetween(formData.checkIn, formData.checkOut);
 
+  const fail = (message, field) => {
+    if (field) field.setAttribute("aria-invalid", "true");
+    showFormErrors([message], field);
+    return false;
+  };
+
   if (parseDate(formData.checkOut) <= parseDate(formData.checkIn)) {
-    alert("Check-out date must be after check-in date.");
-    return false;
+    return fail("Check-out date must be after check-in date.", checkOutInput);
   }
-
   if (nights < settings.booking.minNights) {
-    alert(`Minimum stay is ${settings.booking.minNights} night(s).`);
-    return false;
+    return fail(`Minimum stay is ${settings.booking.minNights} night(s).`, checkOutInput);
   }
-
   if (nights > settings.booking.maxNights) {
-    alert(`Maximum stay is ${settings.booking.maxNights} night(s).`);
-    return false;
+    return fail(`Maximum stay is ${settings.booking.maxNights} night(s).`, checkOutInput);
   }
 
   const bookings = await loadBookings(true);
-  if (!(await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings, collectCats().length || 1))) {
-    alert("Those dates are currently unavailable. Please choose another range.");
-    return false;
+  calendarBookingsCache = bookings;
+  const available = await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings, formCatCount());
+  if (!available) {
+    paintCalendar();
+    return fail("Those dates are currently unavailable for this suite. Please choose another range.", bookingForm.elements.checkIn);
   }
 
   return true;
@@ -833,11 +873,9 @@ function renderBookingSummary() {
   const nights = Math.max(0, daysBetween(formData.checkIn, formData.checkOut));
 
   const rows = [
-    ["Owner", `${formData.ownerName} · ${formData.ownerPhone}`],
-    ["Contact email", formData.ownerEmail],
-    ["Cats", cats.map((cat) => `${cat.name} (${cat.breed}, ${cat.age}y)`).join("; ") || "-"],
     ["Stay", `${formData.checkIn} to ${formData.checkOut} (${nights} night${nights === 1 ? "" : "s"})`],
     ["Suite", suite ? suite.name : formData.suiteType],
+    ["Cats", cats.map((cat) => cat.name).join(", ") || "-"],
     ["Add-ons", addonNames.length ? addonNames.join(", ") : "None"],
   ];
   if (formData.notes) rows.push(["Notes", formData.notes]);
@@ -871,10 +909,13 @@ function showStep(index) {
 stepNextBtn.addEventListener("click", async () => {
   if (!validateStepFields(currentStep)) return;
   if (currentStep === 0 && !(await validateBookingRules())) return;
+  clearFormErrors();
   showStep(currentStep + 1);
+  stepEls[currentStep].querySelector("input, select, textarea")?.focus();
 });
 
 stepBackBtn.addEventListener("click", () => {
+  clearFormErrors();
   showStep(Math.max(0, currentStep - 1));
 });
 
@@ -888,42 +929,126 @@ bookingForm.addEventListener("keydown", (event) => {
 
 bookingForm.addEventListener("input", refreshEstimate);
 
+// ---- Owner pre-fill from a logged-in customer session ------------------------
+
+let sessionProfile = null;
+
+function applyOwnerPrefill() {
+  if (!sessionProfile) return;
+  const fields = { ownerName: sessionProfile.name, ownerEmail: sessionProfile.email, ownerPhone: sessionProfile.phone };
+  Object.entries(fields).forEach(([name, value]) => {
+    const input = bookingForm.elements[name];
+    if (input && value && !input.value) input.value = value;
+  });
+}
+
+async function loadSessionProfile() {
+  const token = safeStorage((store) => store.getItem("lb_user_token"));
+  if (!token) return;
+  try {
+    const res = await fetch("/api/user-auth", { headers: { "x-user-token": token } });
+    if (!res.ok) return;
+    const data = await res.json();
+    sessionProfile = { name: data.name || "", email: data.email || "", phone: data.phone || "" };
+    applyOwnerPrefill();
+  } catch (err) {
+    console.error("session prefill failed", err);
+  }
+}
+
+// ---- Confirmation panel ------------------------------------------------------
+
+function showConfirmation(saved, booking) {
+  const suite = suiteByCode(booking.suiteType);
+  const catNames = booking.cats.map((cat) => cat.name).join(", ");
+
+  document.getElementById("confirm-id").textContent = saved.id;
+  document.getElementById("copy-status").textContent = "";
+  document.getElementById("confirm-message").textContent =
+    `We'll review your booking and email ${booking.ownerEmail} once it's confirmed. Keep this ID to look it up later.`;
+  document.getElementById("confirm-lookup-link").href = `booking-lookup.html?id=${encodeURIComponent(saved.id)}`;
+
+  const whatsappLink = document.getElementById("confirm-whatsapp");
+  const number = window.lbWhatsappNumber(settings);
+  if (number) {
+    const text = `Hi L&B Cattery, I just made booking ${saved.id} for ${catNames} (${suite ? suite.name : booking.suiteType}), ${booking.checkIn} to ${booking.checkOut}.`;
+    whatsappLink.href = window.lbWhatsappUrl(number, text);
+    whatsappLink.hidden = false;
+  } else {
+    whatsappLink.hidden = true;
+  }
+
+  bookingForm.hidden = true;
+  stepIndicatorEl.hidden = true;
+  confirmationEl.hidden = false;
+  confirmationEl.focus();
+}
+
+document.getElementById("copy-booking-id").addEventListener("click", async () => {
+  const idEl = document.getElementById("confirm-id");
+  const statusEl = document.getElementById("copy-status");
+  try {
+    await navigator.clipboard.writeText(idEl.textContent);
+    statusEl.textContent = "Booking ID copied.";
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(idEl);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    statusEl.textContent = "Press Ctrl/Cmd+C to copy the selected booking ID.";
+  }
+});
+
+document.getElementById("new-booking").addEventListener("click", () => {
+  confirmationEl.hidden = true;
+  bookingForm.hidden = false;
+  stepIndicatorEl.hidden = false;
+  showStep(0);
+  applyOwnerPrefill();
+  bookingForm.elements.checkIn.focus();
+});
+
 bookingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (settings.booking.allowPublicBooking === false) {
-    alert("Bookings are currently closed.");
+    showFormErrors(["Bookings are currently closed."]);
     return;
   }
 
+  if (!validateStepFields(currentStep)) return;
   if (!(await validateBookingRules())) return;
 
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
-  const addOns = collectAddOns();
-  const cats = collectCats();
-  const booking = { ...formData, cats, addOns };
+  const booking = { ...formData, cats: collectCats(), addOns: collectAddOns() };
 
+  submitBookingBtn.disabled = true;
   let saved;
   try {
     saved = await saveBooking(booking);
   } catch (err) {
-    showAvailabilityMessage(err.message || "Could not save your booking. Please try again.", false);
-    alert(err.message || "Could not save your booking. Please try again.");
-    await renderAvailabilityCalendar();
+    submitBookingBtn.disabled = false;
+    showFormErrors([err.message || "Could not save your booking. Please try again."]);
+    await loadBookings(true).then((rows) => {
+      calendarBookingsCache = rows;
+      paintCalendar();
+    });
     return;
   }
+  submitBookingBtn.disabled = false;
 
   availabilitySuite.value = formData.suiteType;
-  await loadBookings(true);
   bookingForm.reset();
   resetCatRows();
+  dateSelection.start = null;
+  dateSelection.end = null;
   refreshEstimate();
   showStep(0);
-  await renderAvailabilityCalendar();
-  showAvailabilityMessage(
-    `Booking submitted. Booking ID: ${saved.id} — we'll review it and email ${booking.ownerEmail} once it's confirmed. Keep the ID to look up this booking later.`,
-    true,
-  );
+  showConfirmation(saved, booking);
+  calendarBookingsCache = await loadBookings(true);
+  paintCalendar();
+  showAvailabilityMessage(`Booking ${saved.id} submitted.`, true);
 });
 
 checkAvailabilityBtn.addEventListener("click", async () => {
@@ -950,18 +1075,30 @@ checkAvailabilityBtn.addEventListener("click", async () => {
     return;
   }
 
-  const available = await isDateRangeAvailable(start, end, suiteType, await loadBookings(true), 1);
+  const bookings = await loadBookings(true);
+  const available = await isDateRangeAvailable(start, end, suiteType, bookings, formCatCount());
   if (available) {
-    showAvailabilityMessage("Great news. Those dates are currently available.", true);
+    dateSelection.start = start;
+    dateSelection.end = end;
+    setBookingFormDates(start, end);
+    showAvailabilityMessage("Great news. Those dates are currently available. Fill in the booking form below.", true);
   } else {
     showAvailabilityMessage("That period is fully booked. Try another date range.", false);
   }
 
-  await renderAvailabilityCalendar();
+  calendarBookingsCache = bookings;
+  paintCalendar();
+  if (available) scrollToBookingForm();
 });
 
-availabilitySuite.addEventListener("change", async () => {
-  await renderAvailabilityCalendar();
+// The availability checker and the booking form share one suite choice.
+availabilitySuite.addEventListener("change", () => {
+  const radio = Array.from(bookingForm.querySelectorAll('input[name="suiteType"]')).find((el) => el.value === availabilitySuite.value);
+  if (radio) {
+    radio.checked = true;
+    updateSuiteCardSelection();
+  }
+  paintCalendar();
 });
 
 calPrevBtn.addEventListener("click", async () => {
@@ -1069,6 +1206,11 @@ function setupPwa() {
 async function init() {
   setupPwa();
 
+  const today = todayIso();
+  [bookingForm.elements.checkIn, bookingForm.elements.checkOut, availabilityStart, availabilityEnd].forEach((input) => {
+    input.min = today;
+  });
+
   // Render immediately from defaults; no blocking overlay.
   renderSelectOptions();
   resetCatRows();
@@ -1076,6 +1218,7 @@ async function init() {
   refreshEstimate();
   showStep(0);
   showCalendarSkeleton();
+  loadSessionProfile();
 
   // Fire both requests in parallel.
   const bookingsPromise = loadBookings();

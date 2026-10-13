@@ -694,76 +694,6 @@ button.secondary {
   box-shadow: 0 0 0 2px rgba(215, 156, 53, 0.35);
 }
 
-.calendar-popover {
-  position: fixed;
-  z-index: 60;
-  width: 240px;
-  max-width: calc(100vw - 1.2rem);
-  background: var(--brand-paper);
-  border: 1px solid var(--brand-border);
-  border-radius: 14px;
-  box-shadow: var(--shadow-soft);
-  padding: 0.7rem 0.85rem;
-  font-size: 0.82rem;
-  color: var(--brand-ink);
-  animation: reveal 160ms ease-out;
-}
-
-.calendar-popover[hidden] {
-  display: none;
-}
-
-.calendar-popover h4 {
-  margin: 0 0.6rem 0.4rem 0;
-  font-size: 0.88rem;
-}
-
-.calendar-popover .popover-total {
-  margin: 0 0 0.4rem;
-  font-weight: 700;
-  color: var(--brand-muted);
-}
-
-.calendar-popover .popover-empty {
-  margin: 0;
-  color: var(--brand-muted);
-}
-
-.calendar-popover ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.32rem;
-}
-
-.calendar-popover li {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 1px dashed var(--brand-border);
-}
-
-.calendar-popover li:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.calendar-popover .popover-close {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.5rem;
-  border: none;
-  background: none;
-  font-size: 1.05rem;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--brand-muted);
-  padding: 0.15rem 0.35rem;
-}
-
 .contact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1623,4 +1553,139 @@ th {
   line-height: 1;
   cursor: pointer;
   box-shadow: none;
+}
+
+/* Calendar selection */
+.calendar-day:disabled {
+  cursor: not-allowed;
+  background: #ececec;
+  border-color: #d4d4d4;
+  color: #6b6b6b;
+}
+
+.calendar-day.sel-start,
+.calendar-day.sel-end {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary-dark);
+  font-weight: 700;
+}
+
+.calendar-day.sel-range {
+  background: #ffe8b0;
+  border-color: var(--brand-primary-dark);
+}
+
+.calendar-hint {
+  margin: 0.5rem 0 0;
+  color: var(--brand-muted);
+  font-size: 0.82rem;
+}
+
+/* Form errors and confirmation */
+.form-errors:empty {
+  display: none;
+}
+
+.form-errors {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #b3261e;
+  border-radius: 10px;
+  background: #fdecea;
+  color: #8c1d18;
+  font-size: 0.88rem;
+}
+
+.form-errors ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: #b3261e;
+}
+
+.vaccination-fields {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+}
+
+.vaccination-fields .check-inline {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.booking-confirmation[hidden] {
+  display: none;
+}
+
+.confirm-id-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.confirm-id {
+  padding: 0.4rem 0.8rem;
+  border: 2px dashed var(--brand-primary-dark);
+  border-radius: 10px;
+  background: var(--brand-paper);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.button-link {
+  display: inline-block;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  border: 2px solid var(--brand-primary-dark);
+  background: var(--brand-primary);
+  color: var(--brand-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.button-link.whatsapp {
+  background: #1f7a43;
+  border-color: #1f7a43;
+  color: #fff;
+}
+
+.whatsapp-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  background: #1f7a43;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow-soft);
+}
+
+.whatsapp-fab:focus-visible,
+.button-link:focus-visible {
+  outline: 3px solid var(--brand-ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .whatsapp-fab-label {
+    display: none;
+  }
 }

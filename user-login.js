@@ -140,13 +140,7 @@ function statusBadge(status) {
 }
 
 function catsLabel(row) {
-  const cats = Array.isArray(row.cats) && row.cats.length
-    ? row.cats
-    : row.cat_name
-      ? [{ name: row.cat_name, breed: row.breed, age: row.age }]
-      : [];
-  if (!cats.length) return "-";
-  return cats.map((cat) => `${cat.name || "-"} (${cat.breed || "-"}, ${cat.age ?? "-"}y)`).join("; ");
+  return window.lbCatsLabel(row);
 }
 
 function addOnsLabel(row) {

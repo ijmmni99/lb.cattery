@@ -17,6 +17,9 @@ export const DEFAULT_SETTINGS = {
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
   ],
   promos: [],
+  contact: {
+    whatsappNumber: "",
+  },
 };
 
 export function sanitizeSettings(input) {
@@ -26,8 +29,13 @@ export function sanitizeSettings(input) {
   const suites = Array.isArray(safe.suites) ? safe.suites : [];
   const addons = Array.isArray(safe.addons) ? safe.addons : [];
   const promos = Array.isArray(safe.promos) ? safe.promos : [];
+  const contact = safe.contact && typeof safe.contact === "object" ? safe.contact : {};
 
   return {
+    contact: {
+      // Digits only, international format without "+" (E.164 allows at most 15 digits).
+      whatsappNumber: String(contact.whatsappNumber || "").replace(/\D/g, "").slice(0, 15),
+    },
     booking: {
       allowPublicBooking: booking.allowPublicBooking !== false,
       minNights: Number(booking.minNights) > 0 ? Number(booking.minNights) : 1,

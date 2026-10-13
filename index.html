@@ -82,22 +82,19 @@
           <button id="cal-next" type="button" class="secondary">Next</button>
         </div>
         <div id="availability-calendar" class="availability-calendar" aria-live="polite" aria-busy="true"></div>
-        <div id="calendar-popover" class="calendar-popover" hidden role="dialog" aria-label="Booking summary"></div>
+        <p class="calendar-hint" id="calendar-hint">Tap a day to set your check-in, then tap another day for check-out. Greyed-out days are full.</p>
       </section>
 
-      <section class="card" id="booking-card">
+      <section class="card" id="booking-card" tabindex="-1">
         <h2>Create Reservation</h2>
         <p id="form-mode" class="form-mode">Bookings are open.</p>
         <p id="step-indicator" class="step-indicator" aria-live="polite"></p>
+        <div id="form-errors" class="form-errors" aria-live="assertive" tabindex="-1"></div>
         <form id="booking-form" novalidate>
           <div class="form-step" data-step="0">
             <div class="suite-field">
               <span class="suite-field-label">Suite type</span>
               <div id="suite-options" class="suite-options"></div>
-            </div>
-            <div class="addon-field">
-              <span class="addon-field-label">Add-ons (select any that apply)</span>
-              <div id="addon-options" class="addon-options"></div>
             </div>
             <div class="grid two">
               <label>
@@ -109,36 +106,34 @@
                 <input type="date" name="checkOut" required />
               </label>
             </div>
-          </div>
-
-          <div class="form-step" data-step="1" hidden>
             <div id="cat-rows" class="cat-rows"></div>
             <button type="button" id="add-cat" class="secondary add-cat-btn">+ Add another cat</button>
+            <div class="addon-field">
+              <span class="addon-field-label">Add-ons (select any that apply)</span>
+              <div id="addon-options" class="addon-options"></div>
+            </div>
             <label>
               Special care notes
               <textarea name="notes" rows="3" placeholder="Diet, medication, behavior, preferences"></textarea>
             </label>
           </div>
 
-          <div class="form-step" data-step="2" hidden>
+          <div class="form-step" data-step="1" hidden>
             <div class="grid two">
               <label>
                 Owner name
-                <input type="text" name="ownerName" required />
+                <input type="text" name="ownerName" autocomplete="name" required />
               </label>
               <label>
                 Contact email
-                <input type="email" name="ownerEmail" required />
+                <input type="email" name="ownerEmail" autocomplete="email" required />
               </label>
               <label>
                 Contact phone
-                <input type="tel" name="ownerPhone" required />
+                <input type="tel" name="ownerPhone" autocomplete="tel" required />
               </label>
             </div>
-          </div>
-
-          <div class="form-step" data-step="3" hidden>
-            <h3>Review your reservation</h3>
+            <h3>Booking summary</h3>
             <dl id="booking-summary" class="booking-summary"></dl>
           </div>
 
@@ -149,11 +144,27 @@
             </div>
             <div class="actions-row">
               <button type="button" id="step-back" class="secondary" hidden>Back</button>
-              <button type="button" id="step-next">Next</button>
+              <button type="button" id="step-next">Next: contact &amp; confirm</button>
               <button type="submit" id="submit-booking" hidden>Confirm Reservation</button>
             </div>
           </div>
         </form>
+
+        <div id="booking-confirmation" class="booking-confirmation" tabindex="-1" hidden>
+          <h3>Booking submitted</h3>
+          <p>Your booking ID</p>
+          <div class="confirm-id-row">
+            <code id="confirm-id" class="confirm-id"></code>
+            <button type="button" id="copy-booking-id" class="secondary">Copy</button>
+          </div>
+          <p id="copy-status" class="status" aria-live="polite"></p>
+          <p id="confirm-message"></p>
+          <div class="actions-row">
+            <a id="confirm-lookup-link" class="button-link" href="booking-lookup.html">View booking</a>
+            <a id="confirm-whatsapp" class="button-link whatsapp" href="#" target="_blank" rel="noopener noreferrer" hidden>Send on WhatsApp</a>
+            <button type="button" id="new-booking" class="secondary">Make another booking</button>
+          </div>
+        </div>
       </section>
 
       <section class="card wide" id="contact-card">

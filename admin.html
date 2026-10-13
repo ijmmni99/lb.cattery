@@ -14,7 +14,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="admin-page">
+  <body class="admin-page" data-no-whatsapp>
     <div id="page-loading" class="page-loading" aria-live="polite" aria-busy="true">
       <div class="page-loading-spinner" aria-hidden="true"></div>
       <p>Loading admin backend...</p>
@@ -86,6 +86,7 @@
               <button type="button" class="admin-nav-btn" data-target="panel-suites">Suites</button>
               <button type="button" class="admin-nav-btn" data-target="panel-addons">Add-ons</button>
               <button type="button" class="admin-nav-btn" data-target="panel-promos">Promo Banner</button>
+              <button type="button" class="admin-nav-btn" data-target="panel-contact">Contact</button>
               <button type="button" class="admin-nav-btn" data-target="panel-save">Save Changes</button>
             </nav>
           </aside>
@@ -220,6 +221,21 @@
               </div>
             </section>
 
+            <section id="panel-contact" class="card admin-panel" hidden>
+              <h2>Contact Settings</h2>
+              <p class="form-mode">Shown as WhatsApp buttons on the public pages and in the booking confirmation. Leave empty to hide them.</p>
+              <div class="grid two">
+                <label>
+                  WhatsApp number
+                  <input id="whatsapp-number" type="tel" inputmode="numeric" placeholder="60123456789" autocomplete="off" />
+                </label>
+              </div>
+              <p class="form-mode">Use the international format without + or spaces (for example 60123456789).</p>
+              <div class="actions-row">
+                <button id="save-contact" type="button">Save Contact Settings</button>
+              </div>
+            </section>
+
             <section id="panel-save" class="card admin-panel" hidden>
               <h2>Save Backend Configuration</h2>
               <p class="form-mode">Review changes in each section, then save once to publish updates to the public page.</p>
@@ -232,6 +248,7 @@
       </div>
     </main>
 
+    <script src="site.js" defer></script>
     <script src="admin.js" defer></script>
   </body>
 </html>

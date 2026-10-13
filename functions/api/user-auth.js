@@ -25,7 +25,15 @@ export async function onRequest({ request, env }) {
       return new Response(JSON.stringify({ ok: false }), { status: 401, headers: CORS });
     }
 
-    return new Response(JSON.stringify({ ok: true, email: payload.sub, name: payload.name || "" }), { headers: CORS });
+    // Phone is looked up so the booking form can pre-fill it.
+    let phone = "";
+    const profileRes = await fetch(`${usersBase}?email=eq.${encodeURIComponent(payload.sub)}&select=phone&limit=1`, { headers: auth }).catch(() => null);
+    if (profileRes?.ok) {
+      const rows = await profileRes.json().catch(() => []);
+      phone = (Array.isArray(rows) && rows[0]?.phone) || "";
+    }
+
+    return new Response(JSON.stringify({ ok: true, email: payload.sub, name: payload.name || "", phone }), { headers: CORS });
   }
 
   if (request.method !== "POST") {
