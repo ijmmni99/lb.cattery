@@ -15,6 +15,9 @@ const DEFAULT_SETTINGS = {
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
   ],
   promos: [],
+  contact: {
+    whatsappNumber: "",
+  },
 };
 
 const bookingForm = document.getElementById("booking-form");
@@ -32,7 +35,6 @@ const promoPrevBtn = document.getElementById("promo-prev");
 const promoNextBtn = document.getElementById("promo-next");
 const calendarTitleEl = document.getElementById("calendar-title");
 const calendarEl = document.getElementById("availability-calendar");
-const calendarPopover = document.getElementById("calendar-popover");
 const calPrevBtn = document.getElementById("cal-prev");
 const calNextBtn = document.getElementById("cal-next");
 const formModeEl = document.getElementById("form-mode");
@@ -48,8 +50,11 @@ const stepBackBtn = document.getElementById("step-back");
 const stepNextBtn = document.getElementById("step-next");
 const submitBookingBtn = document.getElementById("submit-booking");
 const bookingSummaryEl = document.getElementById("booking-summary");
+const formErrorsEl = document.getElementById("form-errors");
+const bookingCardEl = document.getElementById("booking-card");
+const confirmationEl = document.getElementById("booking-confirmation");
 
-const STEP_LABELS = ["Suite & Dates", "Cat Details", "Contact Info", "Review & Confirm"];
+const STEP_LABELS = ["Your stay", "Contact & confirm"];
 let currentStep = 0;
 
 const calendarState = {
@@ -58,7 +63,10 @@ const calendarState = {
 };
 
 let calendarBookingsCache = [];
-let activeCalendarDay = null;
+let calendarReady = false;
+
+// Check-in / check-out picked by clicking the calendar.
+const dateSelection = { start: null, end: null };
 
 let promoSlides = [];
 let promoIndex = 0;
@@ -115,42 +123,41 @@ function getSuiteCapacityMap() {
   return Object.fromEntries(settings.suites.filter((suite) => suite.active).map((suite) => [suite.code, Number(suite.capacity) || 1]));
 }
 
-async function getBookings() {
-  const res = await fetch("/api/bookings");
-  if (!res.ok) {
-    console.error("getBookings failed", res.status);
-    return [];
-  }
-  const data = await res.json();
-  return data.map((r) => ({
-    id: r.id,
-    ownerName: r.owner_name,
-    ownerEmail: r.owner_email,
-    ownerPhone: r.owner_phone,
-    cats: Array.isArray(r.cats) && r.cats.length
-      ? r.cats
-      : r.cat_name
-        ? [{ name: r.cat_name, breed: r.breed, age: r.age }]
-        : [],
-    suiteType: r.suite_type,
-    checkIn: r.check_in,
-    checkOut: r.check_out,
-    addOns: Array.isArray(r.add_ons) && r.add_ons.length
-      ? r.add_ons
-      : r.add_on
-        ? [r.add_on]
-        : [],
-    totalPrice: r.total_price,
-    notes: r.notes,
-  }));
+let bookingsCache = null;
+
+// Cached for the page's lifetime; pass force=true after a booking or an explicit refresh.
+async function loadBookings(force = false) {
+  if (!bookingsCache || force) bookingsCache = getBookings();
+  return bookingsCache;
 }
 
+async function getBookings() {
+  try {
+    const res = await fetch("/api/bookings");
+    if (!res.ok) {
+      console.error("getBookings failed", res.status);
+      return [];
+    }
+    const data = await res.json();
+    return data.map((r) => ({
+      suiteType: r.suite_type,
+      checkIn: r.check_in,
+      checkOut: r.check_out,
+      catCount: Math.max(1, Number(r.cats) || 1),
+      status: r.status,
+    }));
+  } catch (err) {
+    console.error("getBookings failed", err);
+    return [];
+  }
+}
+
+// The server generates the id and price; the client only sends the stay details.
 async function saveBooking(booking) {
   const res = await fetch("/api/bookings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      id: booking.id,
       owner_name: booking.ownerName,
       owner_email: booking.ownerEmail,
       owner_phone: booking.ownerPhone,
@@ -159,21 +166,28 @@ async function saveBooking(booking) {
       check_in: booking.checkIn,
       check_out: booking.checkOut,
       add_ons: booking.addOns,
-      total_price: booking.totalPrice,
       notes: booking.notes || null,
     }),
   });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error("saveBooking failed", res.status);
-    throw new Error("Booking save failed");
+    throw new Error(data.error || "Booking save failed");
   }
+  return data;
 }
 
 async function getSettings() {
-  const res = await fetch("/api/settings");
-  if (!res.ok) return structuredClone(DEFAULT_SETTINGS);
-  const data = await res.json();
+  const data = await window.lbFetchSettings();
+  if (!data) return structuredClone(DEFAULT_SETTINGS);
   return normalizeSettings(data);
+}
+
+// Mirrors sanitizeUrl on the server: http(s) or relative paths only.
+function safeUrl(value) {
+  const url = String(value || "").trim();
+  if (/^https?:\/\/[^\s]+$/i.test(url)) return url;
+  if (url && !/^[a-z][a-z0-9+.-]*:/i.test(url) && !url.startsWith("//") && !/\s/.test(url)) return url;
+  return "";
 }
 
 function normalizeSettings(raw) {
@@ -183,8 +197,12 @@ function normalizeSettings(raw) {
   const suites = Array.isArray(safe.suites) ? safe.suites : DEFAULT_SETTINGS.suites;
   const addons = Array.isArray(safe.addons) ? safe.addons : DEFAULT_SETTINGS.addons;
   const promos = Array.isArray(safe.promos) ? safe.promos : DEFAULT_SETTINGS.promos;
+  const contact = safe.contact && typeof safe.contact === "object" ? safe.contact : {};
 
   return {
+    contact: {
+      whatsappNumber: String(contact.whatsappNumber || "").replace(/\D/g, ""),
+    },
     booking: {
       allowPublicBooking: booking.allowPublicBooking !== false,
       minNights: Number(booking.minNights) > 0 ? Number(booking.minNights) : 1,
@@ -196,7 +214,7 @@ function normalizeSettings(raw) {
         name: String(suite.name || "").trim(),
         nightlyRate: Number(suite.nightlyRate) || 0,
         capacity: Math.max(1, Number(suite.capacity) || 1),
-        imageUrl: String(suite.imageUrl || "").trim(),
+        imageUrl: safeUrl(suite.imageUrl),
         active: suite.active !== false,
       }))
       .filter((suite) => suite.code && suite.name),
@@ -211,9 +229,9 @@ function normalizeSettings(raw) {
       .filter((addon) => addon.code && addon.name),
     promos: promos
       .map((promo) => ({
-        imageUrl: String(promo.imageUrl || "").trim(),
+        imageUrl: safeUrl(promo.imageUrl),
         caption: String(promo.caption || "").trim(),
-        linkUrl: String(promo.linkUrl || "").trim(),
+        linkUrl: safeUrl(promo.linkUrl),
         active: promo.active !== false,
       }))
       .filter((promo) => promo.imageUrl && promo.active),
@@ -263,6 +281,7 @@ function renderPromoBanner(promos) {
     img.src = promo.imageUrl;
     img.alt = promo.caption || "Promotion";
     img.loading = "lazy";
+    img.decoding = "async";
 
     if (promo.linkUrl) {
       const link = document.createElement("a");
@@ -339,6 +358,7 @@ function renderSuiteCards(suiteOptions) {
       img.src = suite.imageUrl;
       img.alt = suite.name;
       img.loading = "lazy";
+      img.decoding = "async";
       img.addEventListener("error", () => {
         media.classList.add("suite-card-media-placeholder");
         img.remove();
@@ -372,7 +392,10 @@ function updateSuiteCardSelection() {
 }
 
 bookingForm.addEventListener("change", (event) => {
-  if (event.target.name === "suiteType") updateSuiteCardSelection();
+  if (event.target.name !== "suiteType") return;
+  updateSuiteCardSelection();
+  availabilitySuite.value = event.target.value;
+  if (calendarReady) paintCalendar();
 });
 
 function renderSelectOptions() {
@@ -437,7 +460,20 @@ function createCatRow() {
       Age (years)
       <input type="number" name="age[]" min="0" max="30" step="0.5" required />
     </label>
+    <div class="vaccination-fields">
+      <label class="check-inline">
+        <input type="checkbox" name="vaccinated[]" />
+        Vaccination up to date
+      </label>
+      <label>
+        Vaccination date (optional)
+        <input type="date" name="vaccinationDate[]" />
+      </label>
+    </div>
   `;
+
+  // Static markup above; the only dynamic value is set through the DOM.
+  fields.querySelector('input[name="vaccinationDate[]"]').max = todayIso();
 
   row.append(header, fields);
   return row;
@@ -450,6 +486,8 @@ function updateCatRowChrome() {
     const removeBtn = row.querySelector(".remove-cat-btn");
     removeBtn.hidden = rows.length <= 1;
   });
+  // Cat count changes which days still have room.
+  if (calendarReady) paintCalendar();
 }
 
 function addCatRow() {
@@ -463,10 +501,13 @@ function resetCatRows() {
 }
 
 function collectCats() {
-  const names = Array.from(catRowsEl.querySelectorAll('input[name="catName[]"]')).map((el) => el.value.trim());
-  const breeds = Array.from(catRowsEl.querySelectorAll('input[name="breed[]"]')).map((el) => el.value.trim());
-  const ages = Array.from(catRowsEl.querySelectorAll('input[name="age[]"]')).map((el) => el.value);
-  return names.map((name, index) => ({ name, breed: breeds[index] || "", age: ages[index] || "" }));
+  return Array.from(catRowsEl.querySelectorAll(".cat-card")).map((row) => ({
+    name: row.querySelector('input[name="catName[]"]').value.trim(),
+    breed: row.querySelector('input[name="breed[]"]').value.trim(),
+    age: row.querySelector('input[name="age[]"]').value,
+    vaccinated: row.querySelector('input[name="vaccinated[]"]').checked,
+    vaccinationDate: row.querySelector('input[name="vaccinationDate[]"]').value,
+  }));
 }
 
 function collectAddOns() {
@@ -490,21 +531,27 @@ function formatAddonFee(addon) {
   return "no extra fee";
 }
 
-function datesOverlap(aStart, aEnd, bStart, bEnd) {
-  const startA = parseDate(aStart);
-  const endA = parseDate(aEnd);
-  const startB = parseDate(bStart);
-  const endB = parseDate(bEnd);
-  return startA < endB && endA > startB;
+function catsOnNight(dateIso, suiteType, allBookings) {
+  return allBookings
+    .filter((booking) => booking.suiteType === suiteType && dateIso >= booking.checkIn && dateIso < booking.checkOut)
+    .reduce((sum, booking) => sum + booking.catCount, 0);
 }
 
-async function isDateRangeAvailable(start, end, suiteType, currentBookings = null) {
-  const suiteCapacity = getSuiteCapacityMap();
-  const bookings = currentBookings ?? await getBookings();
-  const overlapsInSuite = bookings.filter(
-    (booking) => booking.suiteType === suiteType && datesOverlap(start, end, booking.checkIn, booking.checkOut),
-  ).length;
-  return overlapsInSuite < (suiteCapacity[suiteType] || 1);
+function eachNightIso(start, end) {
+  const nights = [];
+  const cursor = parseDate(start);
+  const stop = parseDate(end);
+  while (cursor < stop) {
+    nights.push(isoDateFromParts(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return nights;
+}
+
+async function isDateRangeAvailable(start, end, suiteType, currentBookings = null, newCats = 1) {
+  const capacity = getSuiteCapacityMap()[suiteType] || 1;
+  const bookings = currentBookings ?? await loadBookings();
+  return eachNightIso(start, end).every((night) => catsOnNight(night, suiteType, bookings) + newCats <= capacity);
 }
 
 function calculateEstimate(formData, addOnCodes = [], catCount = 1) {
@@ -533,38 +580,73 @@ function isoDateFromParts(year, month, day) {
   return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
+function todayIso() {
+  const now = new Date();
+  return isoDateFromParts(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function formCatCount() {
+  return Math.max(1, collectCats().length);
+}
+
+function isNightFree(dateIso, suiteType, bookings, newCats) {
+  const capacity = getSuiteCapacityMap()[suiteType] || 1;
+  return catsOnNight(dateIso, suiteType, bookings) + newCats <= capacity;
+}
+
+// A day is disabled when it is in the past or full. While waiting for a check-out, days after the check-in
+// stay enabled only if every night in between is free (so a full day can still be a check-out day).
+function isCalendarDayDisabled(dateIso, suiteType, bookings) {
+  if (dateIso < todayIso()) return true;
+  const newCats = formCatCount();
+  const awaitingEnd = dateSelection.start && !dateSelection.end;
+  if (awaitingEnd && dateIso > dateSelection.start) {
+    const nights = eachNightIso(dateSelection.start, dateIso);
+    if (nights.length > settings.booking.maxNights) return true;
+    return !nights.every((night) => isNightFree(night, suiteType, bookings, newCats));
+  }
+  return !isNightFree(dateIso, suiteType, bookings, newCats);
+}
+
 function bookingCountForDate(dateIso, suiteType, allBookings) {
-  return allBookings.filter(
-    (booking) => booking.suiteType === suiteType && dateIso >= booking.checkIn && dateIso < booking.checkOut,
-  ).length;
+  return catsOnNight(dateIso, suiteType, allBookings);
 }
 
 function dayClassByCount(count, suiteType) {
-  const suiteCapacity = getSuiteCapacityMap();
-  const cap = suiteCapacity[suiteType] || 1;
+  const cap = getSuiteCapacityMap()[suiteType] || 1;
   if (count >= cap) return "full";
   if (count > 0) return "limited";
   return "available";
 }
 
-async function renderAvailabilityCalendar() {
+function showCalendarSkeleton() {
+  calendarEl.classList.add("is-loading");
+  calendarEl.setAttribute("aria-busy", "true");
+  calendarEl.innerHTML = "";
+  for (let i = 0; i < 35; i += 1) {
+    const cell = document.createElement("div");
+    cell.className = "calendar-day skeleton";
+    calendarEl.appendChild(cell);
+  }
+}
+
+function paintCalendar() {
   const suiteType = availabilitySuite.value;
   const { year, month } = calendarState;
   const { start, end } = getMonthBounds(year, month);
   const firstWeekday = start.getDay();
   const daysInMonth = end.getDate();
-  const allBookings = await getBookings();
-  calendarBookingsCache = allBookings;
-  closeCalendarPopover();
+  const allBookings = calendarBookingsCache;
 
   calendarTitleEl.textContent = new Intl.DateTimeFormat("en-MY", {
     month: "long",
     year: "numeric",
   }).format(start);
 
+  calendarEl.classList.remove("is-loading");
+  calendarEl.setAttribute("aria-busy", "false");
   calendarEl.innerHTML = "";
-  const weekdayNames = ["S", "M", "T", "W", "T", "F", "S"];
-  weekdayNames.forEach((day) => {
+  ["S", "M", "T", "W", "T", "F", "S"].forEach((day) => {
     const el = document.createElement("div");
     el.className = "calendar-head";
     el.textContent = day;
@@ -580,16 +662,26 @@ async function renderAvailabilityCalendar() {
   for (let day = 1; day <= daysInMonth; day += 1) {
     const isoDate = isoDateFromParts(year, month, day);
     const count = bookingCountForDate(isoDate, suiteType, allBookings);
+    const disabled = isCalendarDayDisabled(isoDate, suiteType, allBookings);
+    const isStart = isoDate === dateSelection.start;
+    const isEnd = isoDate === dateSelection.end;
+    const inRange = dateSelection.start && dateSelection.end && isoDate > dateSelection.start && isoDate < dateSelection.end;
 
     const dayEl = document.createElement("button");
     dayEl.type = "button";
     dayEl.className = `calendar-day ${dayClassByCount(count, suiteType)}`;
+    if (isStart) dayEl.classList.add("sel-start");
+    if (isEnd) dayEl.classList.add("sel-end");
+    if (inRange) dayEl.classList.add("sel-range");
     dayEl.dataset.date = isoDate;
-    dayEl.setAttribute("aria-haspopup", "dialog");
-    dayEl.setAttribute(
-      "aria-label",
-      `${formatDateLong(isoDate)}: ${count > 0 ? `${count} booking${count > 1 ? "s" : ""}` : "no bookings"}. Tap for summary.`,
-    );
+    dayEl.disabled = disabled;
+    dayEl.setAttribute("aria-pressed", isStart || isEnd ? "true" : "false");
+
+    const parts = [formatDateLong(isoDate), count > 0 ? `${count} cat${count > 1 ? "s" : ""} booked` : "no bookings"];
+    if (isStart) parts.push("check-in");
+    if (isEnd) parts.push("check-out");
+    if (disabled) parts.push("not available");
+    dayEl.setAttribute("aria-label", parts.join(", "));
 
     const dayNum = document.createElement("strong");
     dayNum.textContent = String(day);
@@ -602,6 +694,81 @@ async function renderAvailabilityCalendar() {
   }
 }
 
+async function renderAvailabilityCalendar() {
+  calendarBookingsCache = await loadBookings();
+  calendarReady = true;
+  paintCalendar();
+}
+
+function setBookingFormDates(start, end) {
+  bookingForm.elements.checkIn.value = start || "";
+  bookingForm.elements.checkOut.value = end || "";
+  availabilityStart.value = start || "";
+  availabilityEnd.value = end || "";
+  refreshEstimate();
+}
+
+function scrollToBookingForm() {
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  bookingCardEl.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  bookingCardEl.focus({ preventScroll: true });
+}
+
+function handleCalendarDayClick(dateIso) {
+  const { start, end } = dateSelection;
+
+  if (!start || end || dateIso <= start) {
+    dateSelection.start = dateIso;
+    dateSelection.end = null;
+    setBookingFormDates(dateIso, "");
+    showAvailabilityMessage(`Check-in set to ${formatDateLong(dateIso)}. Now pick your check-out day.`, true);
+    paintCalendar();
+    return;
+  }
+
+  const nights = daysBetween(start, dateIso);
+  if (nights < settings.booking.minNights) {
+    showAvailabilityMessage(`Minimum stay is ${settings.booking.minNights} night(s). Pick a later check-out day.`, false);
+    return;
+  }
+
+  dateSelection.end = dateIso;
+  setBookingFormDates(start, dateIso);
+  showAvailabilityMessage(`${formatDateLong(start)} to ${formatDateLong(dateIso)} (${nights} night${nights === 1 ? "" : "s"}). Fill in the booking form below.`, true);
+  paintCalendar();
+  scrollToBookingForm();
+}
+
+calendarEl.addEventListener("click", (event) => {
+  const dayEl = event.target.closest(".calendar-day:not(.empty):not(:disabled)");
+  if (!dayEl?.dataset.date) return;
+  handleCalendarDayClick(dayEl.dataset.date);
+});
+
+// Keep the calendar selection in step with dates typed into either date form.
+function syncSelectionFromInputs(start, end) {
+  dateSelection.start = start || null;
+  dateSelection.end = start && end && end > start ? end : null;
+  if (calendarReady) paintCalendar();
+}
+
+bookingForm.elements.checkIn.addEventListener("change", () => {
+  availabilityStart.value = bookingForm.elements.checkIn.value;
+  syncSelectionFromInputs(bookingForm.elements.checkIn.value, bookingForm.elements.checkOut.value);
+});
+bookingForm.elements.checkOut.addEventListener("change", () => {
+  availabilityEnd.value = bookingForm.elements.checkOut.value;
+  syncSelectionFromInputs(bookingForm.elements.checkIn.value, bookingForm.elements.checkOut.value);
+});
+availabilityStart.addEventListener("change", () => {
+  bookingForm.elements.checkIn.value = availabilityStart.value;
+  syncSelectionFromInputs(availabilityStart.value, availabilityEnd.value);
+});
+availabilityEnd.addEventListener("change", () => {
+  bookingForm.elements.checkOut.value = availabilityEnd.value;
+  syncSelectionFromInputs(availabilityStart.value, availabilityEnd.value);
+});
+
 function formatDateLong(dateIso) {
   return new Intl.DateTimeFormat("en-MY", {
     weekday: "short",
@@ -609,128 +776,6 @@ function formatDateLong(dateIso) {
     month: "long",
     year: "numeric",
   }).format(parseDate(dateIso));
-}
-
-function bookingsSummaryForDate(dateIso, allBookings) {
-  const matches = allBookings.filter((booking) => dateIso >= booking.checkIn && dateIso < booking.checkOut);
-  const bySuite = new Map();
-  matches.forEach((booking) => {
-    const suite = suiteByCode(booking.suiteType);
-    const label = suite ? suite.name : booking.suiteType;
-    bySuite.set(label, (bySuite.get(label) || 0) + 1);
-  });
-  return { total: matches.length, bySuite };
-}
-
-function closeCalendarPopover() {
-  if (!calendarPopover) return;
-  calendarPopover.hidden = true;
-  calendarPopover.innerHTML = "";
-  if (activeCalendarDay) {
-    activeCalendarDay.classList.remove("day-active");
-    activeCalendarDay = null;
-  }
-}
-
-function positionCalendarPopover(anchorEl) {
-  const rect = anchorEl.getBoundingClientRect();
-  const popRect = calendarPopover.getBoundingClientRect();
-  let left = rect.left + rect.width / 2 - popRect.width / 2;
-  left = Math.max(8, Math.min(left, window.innerWidth - popRect.width - 8));
-  let top = rect.bottom + 8;
-  if (top + popRect.height > window.innerHeight - 8) {
-    top = rect.top - popRect.height - 8;
-  }
-  calendarPopover.style.left = `${left}px`;
-  calendarPopover.style.top = `${top}px`;
-}
-
-function renderCalendarPopover(dateIso, anchorEl) {
-  const { total, bySuite } = bookingsSummaryForDate(dateIso, calendarBookingsCache);
-  calendarPopover.innerHTML = "";
-
-  const closeBtn = document.createElement("button");
-  closeBtn.type = "button";
-  closeBtn.className = "popover-close";
-  closeBtn.setAttribute("aria-label", "Close");
-  closeBtn.textContent = "×";
-  closeBtn.addEventListener("click", closeCalendarPopover);
-
-  const heading = document.createElement("h4");
-  heading.textContent = formatDateLong(dateIso);
-
-  calendarPopover.append(closeBtn, heading);
-
-  if (total === 0) {
-    const empty = document.createElement("p");
-    empty.className = "popover-empty";
-    empty.textContent = "No bookings on this date.";
-    calendarPopover.appendChild(empty);
-  } else {
-    const summaryLine = document.createElement("p");
-    summaryLine.className = "popover-total";
-    summaryLine.textContent = `${total} booking${total > 1 ? "s" : ""} total`;
-
-    const list = document.createElement("ul");
-    bySuite.forEach((count, label) => {
-      const li = document.createElement("li");
-      const name = document.createElement("span");
-      name.textContent = label;
-      const num = document.createElement("span");
-      num.textContent = `${count} booking${count > 1 ? "s" : ""}`;
-      li.append(name, num);
-      list.appendChild(li);
-    });
-
-    calendarPopover.append(summaryLine, list);
-  }
-
-  calendarPopover.hidden = false;
-  positionCalendarPopover(anchorEl);
-}
-
-function toggleCalendarPopover(dayEl) {
-  const dateIso = dayEl.dataset.date;
-  if (!dateIso) return;
-  if (activeCalendarDay === dayEl && !calendarPopover.hidden) {
-    closeCalendarPopover();
-    return;
-  }
-  if (activeCalendarDay) activeCalendarDay.classList.remove("day-active");
-  activeCalendarDay = dayEl;
-  dayEl.classList.add("day-active");
-  renderCalendarPopover(dateIso, dayEl);
-}
-
-if (calendarEl && calendarPopover) {
-  calendarEl.addEventListener("click", (event) => {
-    const dayEl = event.target.closest(".calendar-day:not(.empty)");
-    if (!dayEl) return;
-    toggleCalendarPopover(dayEl);
-  });
-
-  document.addEventListener("click", (event) => {
-    if (calendarPopover.hidden) return;
-    const target = event.target;
-    if (calendarPopover.contains(target) || (activeCalendarDay && activeCalendarDay.contains(target))) return;
-    closeCalendarPopover();
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !calendarPopover.hidden) closeCalendarPopover();
-  });
-
-  window.addEventListener("resize", () => {
-    if (!calendarPopover.hidden && activeCalendarDay) positionCalendarPopover(activeCalendarDay);
-  });
-
-  window.addEventListener(
-    "scroll",
-    () => {
-      if (!calendarPopover.hidden) closeCalendarPopover();
-    },
-    { capture: true, passive: true },
-  );
 }
 
 function refreshEstimate() {
@@ -759,39 +804,83 @@ function applyBookingStatus() {
     : "Bookings are temporarily closed. Please contact the administrator.";
 }
 
-function validateStepFields(index) {
-  const inputs = stepEls[index].querySelectorAll("input, select, textarea");
-  for (const el of inputs) {
-    if (!el.reportValidity()) {
-      return false;
-    }
+function fieldLabel(el) {
+  const catTitle = el.closest(".cat-card")?.querySelector(".cat-card-header strong")?.textContent;
+  let label = "";
+  if (el.type === "radio") {
+    label = el.closest(".suite-field")?.querySelector(".suite-field-label")?.textContent || "Suite type";
+  } else {
+    const wrapper = el.closest("label");
+    label = wrapper ? Array.from(wrapper.childNodes).filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join(" ") : "";
   }
-  return true;
+  label = label.replace(/\s+/g, " ").trim() || el.name || "Field";
+  return catTitle ? `${catTitle} – ${label}` : label;
+}
+
+function clearFormErrors() {
+  formErrorsEl.textContent = "";
+  bookingForm.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
+}
+
+// Lists messages in the aria-live region and moves focus to the offending field (or the region itself).
+function showFormErrors(messages, focusEl = null) {
+  formErrorsEl.textContent = "";
+  const list = document.createElement("ul");
+  messages.forEach((message) => {
+    const li = document.createElement("li");
+    li.textContent = message;
+    list.appendChild(li);
+  });
+  formErrorsEl.appendChild(list);
+  (focusEl || formErrorsEl).focus();
+}
+
+function validateStepFields(index) {
+  clearFormErrors();
+  const invalid = [];
+  const seenGroups = new Set();
+  stepEls[index].querySelectorAll("input, select, textarea").forEach((el) => {
+    if (el.disabled || el.checkValidity()) return;
+    if (el.type === "radio") {
+      if (seenGroups.has(el.name)) return;
+      seenGroups.add(el.name);
+    }
+    invalid.push(el);
+  });
+  if (!invalid.length) return true;
+
+  invalid.forEach((el) => el.setAttribute("aria-invalid", "true"));
+  showFormErrors(invalid.map((el) => `${fieldLabel(el)}: ${el.validationMessage}`), invalid[0]);
+  return false;
 }
 
 async function validateBookingRules() {
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
+  const checkOutInput = bookingForm.elements.checkOut;
   const nights = daysBetween(formData.checkIn, formData.checkOut);
 
+  const fail = (message, field) => {
+    if (field) field.setAttribute("aria-invalid", "true");
+    showFormErrors([message], field);
+    return false;
+  };
+
   if (parseDate(formData.checkOut) <= parseDate(formData.checkIn)) {
-    alert("Check-out date must be after check-in date.");
-    return false;
+    return fail("Check-out date must be after check-in date.", checkOutInput);
   }
-
   if (nights < settings.booking.minNights) {
-    alert(`Minimum stay is ${settings.booking.minNights} night(s).`);
-    return false;
+    return fail(`Minimum stay is ${settings.booking.minNights} night(s).`, checkOutInput);
   }
-
   if (nights > settings.booking.maxNights) {
-    alert(`Maximum stay is ${settings.booking.maxNights} night(s).`);
-    return false;
+    return fail(`Maximum stay is ${settings.booking.maxNights} night(s).`, checkOutInput);
   }
 
-  const bookings = await getBookings();
-  if (!(await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings))) {
-    alert("Those dates are currently unavailable. Please choose another range.");
-    return false;
+  const bookings = await loadBookings(true);
+  calendarBookingsCache = bookings;
+  const available = await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings, formCatCount());
+  if (!available) {
+    paintCalendar();
+    return fail("Those dates are currently unavailable for this suite. Please choose another range.", bookingForm.elements.checkIn);
   }
 
   return true;
@@ -806,11 +895,9 @@ function renderBookingSummary() {
   const nights = Math.max(0, daysBetween(formData.checkIn, formData.checkOut));
 
   const rows = [
-    ["Owner", `${formData.ownerName} · ${formData.ownerPhone}`],
-    ["Contact email", formData.ownerEmail],
-    ["Cats", cats.map((cat) => `${cat.name} (${cat.breed}, ${cat.age}y)`).join("; ") || "-"],
     ["Stay", `${formData.checkIn} to ${formData.checkOut} (${nights} night${nights === 1 ? "" : "s"})`],
     ["Suite", suite ? suite.name : formData.suiteType],
+    ["Cats", cats.map((cat) => cat.name).join(", ") || "-"],
     ["Add-ons", addonNames.length ? addonNames.join(", ") : "None"],
   ];
   if (formData.notes) rows.push(["Notes", formData.notes]);
@@ -844,10 +931,13 @@ function showStep(index) {
 stepNextBtn.addEventListener("click", async () => {
   if (!validateStepFields(currentStep)) return;
   if (currentStep === 0 && !(await validateBookingRules())) return;
+  clearFormErrors();
   showStep(currentStep + 1);
+  stepEls[currentStep].querySelector("input, select, textarea")?.focus();
 });
 
 stepBackBtn.addEventListener("click", () => {
+  clearFormErrors();
   showStep(Math.max(0, currentStep - 1));
 });
 
@@ -861,38 +951,126 @@ bookingForm.addEventListener("keydown", (event) => {
 
 bookingForm.addEventListener("input", refreshEstimate);
 
+// ---- Owner pre-fill from a logged-in customer session ------------------------
+
+let sessionProfile = null;
+
+function applyOwnerPrefill() {
+  if (!sessionProfile) return;
+  const fields = { ownerName: sessionProfile.name, ownerEmail: sessionProfile.email, ownerPhone: sessionProfile.phone };
+  Object.entries(fields).forEach(([name, value]) => {
+    const input = bookingForm.elements[name];
+    if (input && value && !input.value) input.value = value;
+  });
+}
+
+async function loadSessionProfile() {
+  const token = safeStorage((store) => store.getItem("lb_user_token"));
+  if (!token) return;
+  try {
+    const res = await fetch("/api/user-auth", { headers: { "x-user-token": token } });
+    if (!res.ok) return;
+    const data = await res.json();
+    sessionProfile = { name: data.name || "", email: data.email || "", phone: data.phone || "" };
+    applyOwnerPrefill();
+  } catch (err) {
+    console.error("session prefill failed", err);
+  }
+}
+
+// ---- Confirmation panel ------------------------------------------------------
+
+function showConfirmation(saved, booking) {
+  const suite = suiteByCode(booking.suiteType);
+  const catNames = booking.cats.map((cat) => cat.name).join(", ");
+
+  document.getElementById("confirm-id").textContent = saved.id;
+  document.getElementById("copy-status").textContent = "";
+  document.getElementById("confirm-message").textContent =
+    `We'll review your booking and email ${booking.ownerEmail} once it's confirmed. Keep this ID to look it up later.`;
+  document.getElementById("confirm-lookup-link").href = `booking-lookup.html?id=${encodeURIComponent(saved.id)}`;
+
+  const whatsappLink = document.getElementById("confirm-whatsapp");
+  const number = window.lbWhatsappNumber(settings);
+  if (number) {
+    const text = `Hi L&B Cattery, I just made booking ${saved.id} for ${catNames} (${suite ? suite.name : booking.suiteType}), ${booking.checkIn} to ${booking.checkOut}.`;
+    whatsappLink.href = window.lbWhatsappUrl(number, text);
+    whatsappLink.hidden = false;
+  } else {
+    whatsappLink.hidden = true;
+  }
+
+  bookingForm.hidden = true;
+  stepIndicatorEl.hidden = true;
+  confirmationEl.hidden = false;
+  confirmationEl.focus();
+}
+
+document.getElementById("copy-booking-id").addEventListener("click", async () => {
+  const idEl = document.getElementById("confirm-id");
+  const statusEl = document.getElementById("copy-status");
+  try {
+    await navigator.clipboard.writeText(idEl.textContent);
+    statusEl.textContent = "Booking ID copied.";
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(idEl);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    statusEl.textContent = "Press Ctrl/Cmd+C to copy the selected booking ID.";
+  }
+});
+
+document.getElementById("new-booking").addEventListener("click", () => {
+  confirmationEl.hidden = true;
+  bookingForm.hidden = false;
+  stepIndicatorEl.hidden = false;
+  showStep(0);
+  applyOwnerPrefill();
+  bookingForm.elements.checkIn.focus();
+});
+
 bookingForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (settings.booking.allowPublicBooking === false) {
-    alert("Bookings are currently closed.");
+    showFormErrors(["Bookings are currently closed."]);
     return;
   }
 
+  if (!validateStepFields(currentStep)) return;
   if (!(await validateBookingRules())) return;
 
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
-  const addOns = collectAddOns();
-  const cats = collectCats();
-  const booking = {
-    ...formData,
-    cats,
-    addOns,
-    id: `LB-${Date.now().toString().slice(-6)}`,
-    totalPrice: calculateEstimate(formData, addOns, cats.length),
-  };
+  const booking = { ...formData, cats: collectCats(), addOns: collectAddOns() };
 
-  await saveBooking(booking);
+  submitBookingBtn.disabled = true;
+  let saved;
+  try {
+    saved = await saveBooking(booking);
+  } catch (err) {
+    submitBookingBtn.disabled = false;
+    showFormErrors([err.message || "Could not save your booking. Please try again."]);
+    await loadBookings(true).then((rows) => {
+      calendarBookingsCache = rows;
+      paintCalendar();
+    });
+    return;
+  }
+  submitBookingBtn.disabled = false;
+
   availabilitySuite.value = formData.suiteType;
   bookingForm.reset();
   resetCatRows();
+  dateSelection.start = null;
+  dateSelection.end = null;
   refreshEstimate();
   showStep(0);
-  await renderAvailabilityCalendar();
-  showAvailabilityMessage(
-    `Booking submitted. Booking ID: ${booking.id} — we'll review it and email ${booking.ownerEmail} once it's confirmed. Keep the ID to look up this booking later.`,
-    true,
-  );
+  showConfirmation(saved, booking);
+  calendarBookingsCache = await loadBookings(true);
+  paintCalendar();
+  showAvailabilityMessage(`Booking ${saved.id} submitted.`, true);
 });
 
 checkAvailabilityBtn.addEventListener("click", async () => {
@@ -919,18 +1097,30 @@ checkAvailabilityBtn.addEventListener("click", async () => {
     return;
   }
 
-  const available = await isDateRangeAvailable(start, end, suiteType);
+  const bookings = await loadBookings(true);
+  const available = await isDateRangeAvailable(start, end, suiteType, bookings, formCatCount());
   if (available) {
-    showAvailabilityMessage("Great news. Those dates are currently available.", true);
+    dateSelection.start = start;
+    dateSelection.end = end;
+    setBookingFormDates(start, end);
+    showAvailabilityMessage("Great news. Those dates are currently available. Fill in the booking form below.", true);
   } else {
     showAvailabilityMessage("That period is fully booked. Try another date range.", false);
   }
 
-  await renderAvailabilityCalendar();
+  calendarBookingsCache = bookings;
+  paintCalendar();
+  if (available) scrollToBookingForm();
 });
 
-availabilitySuite.addEventListener("change", async () => {
-  await renderAvailabilityCalendar();
+// The availability checker and the booking form share one suite choice.
+availabilitySuite.addEventListener("change", () => {
+  const radio = Array.from(bookingForm.querySelectorAll('input[name="suiteType"]')).find((el) => el.value === availabilitySuite.value);
+  if (radio) {
+    radio.checked = true;
+    updateSuiteCardSelection();
+  }
+  paintCalendar();
 });
 
 calPrevBtn.addEventListener("click", async () => {
@@ -951,28 +1141,121 @@ calNextBtn.addEventListener("click", async () => {
   await renderAvailabilityCalendar();
 });
 
-function hidePageLoading() {
-  const el = document.getElementById("page-loading");
-  if (!el) return;
-  el.classList.add("fade-out");
-  setTimeout(() => {
-    el.hidden = true;
-  }, 220);
+// Re-render options after settings arrive without losing what the visitor already picked.
+function refreshFormFromSettings() {
+  const selectedSuite = bookingForm.querySelector('input[name="suiteType"]:checked')?.value;
+  const checkedAddOns = new Set(collectAddOns());
+  const availabilitySuiteValue = availabilitySuite.value;
+
+  renderSelectOptions();
+
+  const suiteRadio = Array.from(bookingForm.querySelectorAll('input[name="suiteType"]')).find((el) => el.value === selectedSuite);
+  if (suiteRadio) {
+    suiteRadio.checked = true;
+    updateSuiteCardSelection();
+  }
+  Array.from(addonOptionsEl.querySelectorAll('input[name="addOn"]')).forEach((el) => {
+    el.checked = checkedAddOns.has(el.value);
+  });
+  if (Array.from(availabilitySuite.options).some((o) => o.value === availabilitySuiteValue)) {
+    availabilitySuite.value = availabilitySuiteValue;
+  }
+}
+
+// ---- PWA: service worker + install prompts ----------------------------------
+
+function safeStorage(action) {
+  try {
+    return action(window.localStorage);
+  } catch {
+    return null;
+  }
+}
+
+function setupPwa() {
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch((err) => console.error("service worker registration failed", err));
+    });
+  }
+
+  const banner = document.getElementById("install-banner");
+  const installBtn = document.getElementById("install-btn");
+  const dismissBtn = document.getElementById("install-dismiss");
+  const iosHint = document.getElementById("ios-install-hint");
+  const iosDismiss = document.getElementById("ios-hint-dismiss");
+  let deferredPrompt = null;
+
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  if (isStandalone) return;
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    if (safeStorage((s) => s.getItem("lb_install_dismissed"))) return;
+    deferredPrompt = event;
+    banner.hidden = false;
+  });
+
+  installBtn?.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    banner.hidden = true;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice.catch(() => null);
+    deferredPrompt = null;
+  });
+
+  dismissBtn?.addEventListener("click", () => {
+    banner.hidden = true;
+    safeStorage((s) => s.setItem("lb_install_dismissed", "1"));
+  });
+
+  window.addEventListener("appinstalled", () => {
+    banner.hidden = true;
+  });
+
+  const ua = window.navigator.userAgent;
+  const isIos = /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua);
+  if (isIos && isSafari && !safeStorage((s) => s.getItem("lb_ios_hint_seen"))) {
+    iosHint.hidden = false;
+    safeStorage((s) => s.setItem("lb_ios_hint_seen", "1"));
+    iosDismiss?.addEventListener("click", () => {
+      iosHint.hidden = true;
+    });
+  }
 }
 
 async function init() {
-  try {
-    settings = await getSettings();
-    renderSelectOptions();
+  setupPwa();
+
+  const today = todayIso();
+  [bookingForm.elements.checkIn, bookingForm.elements.checkOut, availabilityStart, availabilityEnd].forEach((input) => {
+    input.min = today;
+  });
+
+  // Render immediately from defaults; no blocking overlay.
+  renderSelectOptions();
+  resetCatRows();
+  applyBookingStatus();
+  refreshEstimate();
+  showStep(0);
+  showCalendarSkeleton();
+  loadSessionProfile();
+
+  // Fire both requests in parallel.
+  const bookingsPromise = loadBookings();
+  const loadedSettings = await getSettings().catch(() => null);
+
+  if (loadedSettings) {
+    settings = loadedSettings;
+    refreshFormFromSettings();
     renderPromoBanner(settings.promos);
-    resetCatRows();
     applyBookingStatus();
     refreshEstimate();
-    showStep(0);
-    await renderAvailabilityCalendar();
-  } finally {
-    hidePageLoading();
   }
+
+  await bookingsPromise;
+  await renderAvailabilityCalendar();
 }
 
 init();

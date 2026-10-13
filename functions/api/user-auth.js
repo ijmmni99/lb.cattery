@@ -1,41 +1,22 @@
-import { createSessionToken, getTokenFromRequest, hashPassword, verifySessionToken } from "./_sessionAuth.js";
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, x-user-token, authorization",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Content-Type": "application/json",
-};
-
-function getUserSecret(env) {
-  return env.USER_TOKEN_SECRET || env.SUPABASE_ANON_KEY || "";
-}
-
-function getSupabaseAuth(env) {
-  const restKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
-  return {
-    apikey: restKey,
-    Authorization: `Bearer ${restKey}`,
-    "Content-Type": "application/json",
-  };
-}
+import { corsHeaders, json, notConfigured, rateLimit, supabaseHeaders } from "./_common.js";
+import { createSessionToken, getTokenFromRequest, hashPassword, verifyPassword, verifySessionToken } from "./_sessionAuth.js";
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
 export async function onRequest({ request, env }) {
+  const CORS = corsHeaders(request, env, { headers: "Content-Type, x-user-token, authorization" });
+
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: CORS });
   }
 
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-    return new Response(JSON.stringify({ error: "Missing Supabase env vars" }), { status: 500, headers: CORS });
-  }
+  const auth = supabaseHeaders(env);
+  const userSecret = env.USER_TOKEN_SECRET || "";
+  if (!auth || !userSecret) return notConfigured(CORS);
 
   const usersBase = `${env.SUPABASE_URL}/rest/v1/app_users`;
-  const auth = getSupabaseAuth(env);
-  const userSecret = getUserSecret(env);
 
   if (request.method === "GET") {
     const token = getTokenFromRequest(request, "x-user-token");
@@ -44,12 +25,23 @@ export async function onRequest({ request, env }) {
       return new Response(JSON.stringify({ ok: false }), { status: 401, headers: CORS });
     }
 
-    return new Response(JSON.stringify({ ok: true, email: payload.sub, name: payload.name || "" }), { headers: CORS });
+    // Phone is looked up so the booking form can pre-fill it.
+    let phone = "";
+    const profileRes = await fetch(`${usersBase}?email=eq.${encodeURIComponent(payload.sub)}&select=phone&limit=1`, { headers: auth }).catch(() => null);
+    if (profileRes?.ok) {
+      const rows = await profileRes.json().catch(() => []);
+      phone = (Array.isArray(rows) && rows[0]?.phone) || "";
+    }
+
+    return new Response(JSON.stringify({ ok: true, email: payload.sub, name: payload.name || "", phone }), { headers: CORS });
   }
 
   if (request.method !== "POST") {
     return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: CORS });
   }
+
+  const limited = await rateLimit(request, env, "user-auth", CORS);
+  if (limited) return limited;
 
   const body = await request.json().catch(() => null);
   const action = String(body?.action || "").trim().toLowerCase();
@@ -87,7 +79,7 @@ export async function onRequest({ request, env }) {
       return new Response(JSON.stringify({ error: "Email is already registered" }), { status: 409, headers: CORS });
     }
 
-    const passwordHash = await hashPassword(password, userSecret);
+    const passwordHash = await hashPassword(password, env);
     const userId = `USR-${Date.now().toString(36)}-${Math.floor(Math.random() * 100000).toString(36)}`;
 
     const insertRes = await fetch(usersBase, {
@@ -155,9 +147,25 @@ export async function onRequest({ request, env }) {
       return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: CORS });
     }
 
-    const passwordHash = await hashPassword(password, userSecret);
-    if (passwordHash !== user.password_hash) {
+    // Old rows were hashed with SHA-256 + USER_TOKEN_SECRET (or the anon key on deployments that relied on the old fallback).
+    const legacySecret = env.LEGACY_PASSWORD_SECRET || userSecret;
+    const { ok, needsUpgrade } = await verifyPassword(password, user.password_hash, legacySecret, env);
+    if (!ok) {
       return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: CORS });
+    }
+
+    if (needsUpgrade) {
+      try {
+        const upgraded = await hashPassword(password, env);
+        const upRes = await fetch(`${usersBase}?id=eq.${encodeURIComponent(user.id)}`, {
+          method: "PATCH",
+          headers: { ...auth, Prefer: "return=minimal" },
+          body: JSON.stringify({ password_hash: upgraded }),
+        });
+        if (!upRes.ok) console.error("password upgrade failed", upRes.status);
+      } catch (err) {
+        console.error("password upgrade failed", err);
+      }
     }
 
     const token = await createSessionToken(email, userSecret, 12 * 60 * 60 * 1000, {

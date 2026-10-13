@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline | L&B Cattery</title>
+    <meta name="robots" content="noindex" />
+    <link rel="preload" href="/assets/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#fdbe4c" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="admin-page">
+    <header class="site-header">
+      <div class="header-top">
+        <div class="brand-wrap">
+          <picture>
+            <source srcset="/assets/logo-256.webp" type="image/webp" />
+            <img src="/assets/logo-256.jpg" alt="L&B Cattery logo" class="brand-logo" width="256" height="256" decoding="async" />
+          </picture>
+          <div>
+            <p class="eyebrow">Cat Hotel &amp; Care</p>
+            <h1>You're offline</h1>
+            <p class="brand-tagline">Safe. Comfy. Loved.</p>
+          </div>
+        </div>
+      </div>
+      <p class="intro">We can't reach the booking system right now. Check your connection and try again, or contact us directly.</p>
+    </header>
+
+    <main class="layout admin-layout">
+      <section class="card wide">
+        <h2>Contact us</h2>
+        <div class="contact-details">
+          <div class="contact-item" id="offline-whatsapp" hidden>
+            <span class="contact-icon" aria-hidden="true">📞</span>
+            <div>
+              <p class="contact-label">Phone / WhatsApp</p>
+              <p><a id="offline-whatsapp-link" href="#"></a></p>
+            </div>
+          </div>
+          <div class="contact-item">
+            <span class="contact-icon" aria-hidden="true">📍</span>
+            <div>
+              <p class="contact-label">Address</p>
+              <p>Amberside, Country Garden, Persiaran Danga Perdana, 80200 Johor Bahru, Johor Darul Ta'zim, Malaysia</p>
+            </div>
+          </div>
+        </div>
+        <div class="actions-row">
+          <button type="button" id="offline-retry">Try again</button>
+        </div>
+      </section>
+    </main>
+    <script src="/offline.js" defer></script>
+  </body>
+</html>

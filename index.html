@@ -4,24 +4,65 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>L&B Cattery | Booking & Reservations</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Poppins:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <meta name="description" content="Book cat boarding at L&B Cattery in Johor Bahru. Safe, comfy, loved: private suites, add-on grooming and playtime, transparent rates and live availability." />
+    <link rel="canonical" href="https://lbcattery.pages.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="L&amp;B Cattery" />
+    <meta property="og:title" content="L&amp;B Cattery | Cat Boarding in Johor Bahru" />
+    <meta property="og:description" content="Book cat boarding at L&B Cattery in Johor Bahru. Safe, comfy, loved: private suites, add-on grooming and playtime, transparent rates and live availability." />
+    <meta property="og:url" content="https://lbcattery.pages.dev/" />
+    <meta property="og:image" content="https://lbcattery.pages.dev/assets/promo.webp" />
+    <meta property="og:image:width" content="956" />
+    <meta property="og:image:height" content="319" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="L&amp;B Cattery | Cat Boarding in Johor Bahru" />
+    <meta name="twitter:description" content="Book cat boarding at L&B Cattery in Johor Bahru. Safe, comfy, loved: private suites, add-on grooming and playtime, transparent rates and live availability." />
+    <meta name="twitter:image" content="https://lbcattery.pages.dev/assets/promo.webp" />
+    <link rel="preload" href="assets/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#fdbe4c" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/icons/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="L&amp;B Cattery" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": "L&B Cattery",
+        "description": "Cat hotel and boarding in Johor Bahru. Safe. Comfy. Loved.",
+        "url": "https://lbcattery.pages.dev/",
+        "image": "https://lbcattery.pages.dev/assets/promo.webp",
+        "logo": "https://lbcattery.pages.dev/assets/logo-256.jpg",
+        "email": "lbcatteryofficial@gmail.com",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Amberside, Country Garden, Persiaran Danga Perdana",
+          "addressLocality": "Johor Bahru",
+          "addressRegion": "Johor",
+          "postalCode": "80200",
+          "addressCountry": "MY"
+        },
+        "openingHoursSpecification": [
+          { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "opens": "20:00", "closes": "22:00" },
+          { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Saturday", "Sunday"], "opens": "09:00", "closes": "22:00" }
+        ]
+      }
+    </script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="page-loading" class="page-loading" aria-live="polite" aria-busy="true">
-      <div class="page-loading-spinner" aria-hidden="true"></div>
-      <p>Loading booking desk...</p>
-    </div>
-
     <header class="site-header">
       <div class="header-top">
         <div class="brand-wrap">
-          <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
+          <picture>
+            <source srcset="assets/logo-256.webp" type="image/webp" />
+            <img src="assets/logo-256.jpg" alt="L&B Cattery logo" class="brand-logo" width="256" height="256" decoding="async" />
+          </picture>
           <div>
             <p class="eyebrow">Cat Hotel & Care</p>
             <h1>L&B Cattery Booking Desk</h1>
@@ -30,7 +71,7 @@
         </div>
 
         <div class="header-auth">
-          <button id="account-menu-btn" class="account-btn secondary" type="button" aria-haspopup="true" aria-expanded="false">
+          <button id="account-menu-btn" class="account-btn secondary" type="button" aria-label="Account" aria-haspopup="true" aria-expanded="false">
             <span class="account-icon" aria-hidden="true"></span>
             <span class="account-btn-label">Account</span>
           </button>
@@ -81,23 +122,20 @@
           <p id="calendar-title" class="calendar-title"></p>
           <button id="cal-next" type="button" class="secondary">Next</button>
         </div>
-        <div id="availability-calendar" class="availability-calendar" aria-live="polite"></div>
-        <div id="calendar-popover" class="calendar-popover" hidden role="dialog" aria-label="Booking summary"></div>
+        <div id="availability-calendar" class="availability-calendar" aria-live="polite" aria-busy="true"></div>
+        <p class="calendar-hint" id="calendar-hint">Tap a day to set your check-in, then tap another day for check-out. Greyed-out days are full.</p>
       </section>
 
-      <section class="card" id="booking-card">
+      <section class="card" id="booking-card" tabindex="-1">
         <h2>Create Reservation</h2>
         <p id="form-mode" class="form-mode">Bookings are open.</p>
         <p id="step-indicator" class="step-indicator" aria-live="polite"></p>
+        <div id="form-errors" class="form-errors" aria-live="assertive" tabindex="-1"></div>
         <form id="booking-form" novalidate>
           <div class="form-step" data-step="0">
             <div class="suite-field">
               <span class="suite-field-label">Suite type</span>
               <div id="suite-options" class="suite-options"></div>
-            </div>
-            <div class="addon-field">
-              <span class="addon-field-label">Add-ons (select any that apply)</span>
-              <div id="addon-options" class="addon-options"></div>
             </div>
             <div class="grid two">
               <label>
@@ -109,36 +147,34 @@
                 <input type="date" name="checkOut" required />
               </label>
             </div>
-          </div>
-
-          <div class="form-step" data-step="1" hidden>
             <div id="cat-rows" class="cat-rows"></div>
             <button type="button" id="add-cat" class="secondary add-cat-btn">+ Add another cat</button>
+            <div class="addon-field">
+              <span class="addon-field-label">Add-ons (select any that apply)</span>
+              <div id="addon-options" class="addon-options"></div>
+            </div>
             <label>
               Special care notes
               <textarea name="notes" rows="3" placeholder="Diet, medication, behavior, preferences"></textarea>
             </label>
           </div>
 
-          <div class="form-step" data-step="2" hidden>
+          <div class="form-step" data-step="1" hidden>
             <div class="grid two">
               <label>
                 Owner name
-                <input type="text" name="ownerName" required />
+                <input type="text" name="ownerName" autocomplete="name" required />
               </label>
               <label>
                 Contact email
-                <input type="email" name="ownerEmail" required />
+                <input type="email" name="ownerEmail" autocomplete="email" required />
               </label>
               <label>
                 Contact phone
-                <input type="tel" name="ownerPhone" required />
+                <input type="tel" name="ownerPhone" autocomplete="tel" required />
               </label>
             </div>
-          </div>
-
-          <div class="form-step" data-step="3" hidden>
-            <h3>Review your reservation</h3>
+            <h3>Booking summary</h3>
             <dl id="booking-summary" class="booking-summary"></dl>
           </div>
 
@@ -149,11 +185,27 @@
             </div>
             <div class="actions-row">
               <button type="button" id="step-back" class="secondary" hidden>Back</button>
-              <button type="button" id="step-next">Next</button>
+              <button type="button" id="step-next">Next: contact &amp; confirm</button>
               <button type="submit" id="submit-booking" hidden>Confirm Reservation</button>
             </div>
           </div>
         </form>
+
+        <div id="booking-confirmation" class="booking-confirmation" tabindex="-1" hidden>
+          <h3>Booking submitted</h3>
+          <p>Your booking ID</p>
+          <div class="confirm-id-row">
+            <code id="confirm-id" class="confirm-id"></code>
+            <button type="button" id="copy-booking-id" class="secondary">Copy</button>
+          </div>
+          <p id="copy-status" class="status" aria-live="polite"></p>
+          <p id="confirm-message"></p>
+          <div class="actions-row">
+            <a id="confirm-lookup-link" class="button-link" href="booking-lookup.html">View booking</a>
+            <a id="confirm-whatsapp" class="button-link whatsapp" href="#" target="_blank" rel="noopener noreferrer" hidden>Send on WhatsApp</a>
+            <button type="button" id="new-booking" class="secondary">Make another booking</button>
+          </div>
+        </div>
       </section>
 
       <section class="card wide" id="contact-card">
@@ -209,6 +261,16 @@
       </section>
     </main>
 
-    <script src="script.js"></script>
+    <div id="install-banner" class="install-banner" hidden>
+      <button type="button" id="install-btn" class="install-btn">Install app</button>
+      <button type="button" id="install-dismiss" class="install-dismiss" aria-label="Dismiss install prompt">&times;</button>
+    </div>
+    <div id="ios-install-hint" class="install-banner ios-hint" role="status" hidden>
+      <span>Install this app: tap <strong>Share</strong> &rarr; <strong>Add to Home Screen</strong></span>
+      <button type="button" id="ios-hint-dismiss" class="install-dismiss" aria-label="Dismiss">&times;</button>
+    </div>
+
+    <script src="site.js" defer></script>
+    <script src="script.js" defer></script>
   </body>
 </html>

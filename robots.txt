@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /api/
+Disallow: /offline.html
+
+Sitemap: https://lbcattery.pages.dev/sitemap.xml

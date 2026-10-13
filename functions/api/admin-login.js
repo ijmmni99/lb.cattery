@@ -1,47 +1,42 @@
 import { createAdminToken, getAdminSecret, getAdminTokenFromRequest, verifyAdminToken } from "./_adminAuth.js";
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-token, authorization",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Content-Type": "application/json",
-};
+import { corsHeaders, json, notConfigured, rateLimit, secretsMatch } from "./_common.js";
 
 export async function onRequest({ request, env }) {
+  const cors = corsHeaders(request, env, { headers: "Content-Type, x-admin-token, authorization" });
+
   if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS });
+    return new Response(null, { headers: cors });
   }
 
   const adminSecret = getAdminSecret(env);
-  if (!adminSecret) {
-    return new Response(JSON.stringify({ error: "Admin auth is not configured" }), { status: 500, headers: CORS });
-  }
+  if (!adminSecret || !env.ADMIN_PASSWORD) return notConfigured(cors);
 
   if (request.method === "GET") {
     const token = getAdminTokenFromRequest(request);
     const valid = await verifyAdminToken(token, adminSecret);
-    if (!valid) {
-      return new Response(JSON.stringify({ ok: false }), { status: 401, headers: CORS });
-    }
-
-    return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+    if (!valid) return json(cors, { ok: false }, 401);
+    return json(cors, { ok: true });
   }
 
   if (request.method === "POST") {
+    const limited = await rateLimit(request, env, "admin-login", cors);
+    if (limited) return limited;
+
     const body = await request.json().catch(() => null);
     const username = String(body?.username || "").trim();
     const password = String(body?.password || "");
 
     const expectedUsername = env.ADMIN_USERNAME || "admin";
-    const expectedPassword = env.ADMIN_PASSWORD || env.ADMIN_API_KEY || env.SUPABASE_ANON_KEY || "";
+    const [userOk, passOk] = await Promise.all([
+      secretsMatch(username, expectedUsername),
+      secretsMatch(password, env.ADMIN_PASSWORD),
+    ]);
 
-    if (!expectedPassword || username !== expectedUsername || password !== expectedPassword) {
-      return new Response(JSON.stringify({ error: "Invalid credentials" }), { status: 401, headers: CORS });
-    }
+    if (!userOk || !passOk) return json(cors, { error: "Invalid credentials" }, 401);
 
     const token = await createAdminToken(username, adminSecret);
-    return new Response(JSON.stringify({ ok: true, token }), { headers: CORS });
+    return json(cors, { ok: true, token });
   }
 
-  return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: CORS });
+  return json(cors, { error: "Not found" }, 404);
 }

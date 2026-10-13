@@ -20,13 +20,7 @@ function showStatus(message, ok) {
 }
 
 function catsLabel(booking) {
-  const cats = Array.isArray(booking.cats) && booking.cats.length
-    ? booking.cats
-    : booking.cat_name
-      ? [{ name: booking.cat_name, breed: booking.breed, age: booking.age }]
-      : [];
-  if (!cats.length) return "-";
-  return cats.map((cat) => `${cat.name || "-"} (${cat.breed || "-"}, ${cat.age ?? "-"}y)`).join("; ");
+  return window.lbCatsLabel(booking);
 }
 
 function addOnsLabel(booking) {
@@ -106,3 +100,10 @@ lookupForm.addEventListener("submit", async (event) => {
   showStatus("Booking found.", true);
   renderBooking(data);
 });
+
+// Arriving from the booking confirmation: pre-fill the ID and jump to the email field.
+const prefillId = new URLSearchParams(window.location.search).get("id");
+if (prefillId) {
+  bookingIdInput.value = prefillId.trim().slice(0, 40);
+  emailInput.focus();
+}

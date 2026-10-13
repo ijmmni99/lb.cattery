@@ -15,6 +15,9 @@ const DEFAULT_SETTINGS = {
     { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
   ],
   promos: [],
+  contact: {
+    whatsappNumber: "",
+  },
 };
 
 const usernameInput = document.getElementById("admin-username");
@@ -53,6 +56,8 @@ const saveBookingBtn = document.getElementById("save-booking");
 const saveSuitesBtn = document.getElementById("save-suites");
 const saveAddonsBtn = document.getElementById("save-addons");
 const savePromosBtn = document.getElementById("save-promos");
+const saveContactBtn = document.getElementById("save-contact");
+const whatsappNumberEl = document.getElementById("whatsapp-number");
 
 function getAdminToken() {
   return localStorage.getItem("lb_admin_token") || "";
@@ -92,6 +97,8 @@ function setWorkspaceVisible(visible) {
   saveBookingBtn.disabled = !visible;
   saveSuitesBtn.disabled = !visible;
   saveAddonsBtn.disabled = !visible;
+  savePromosBtn.disabled = !visible;
+  saveContactBtn.disabled = !visible;
 }
 
 function setLoginCardVisible(visible) {
@@ -294,19 +301,18 @@ async function fetchSettings() {
 }
 
 async function fetchBookings() {
-  const res = await fetch("/api/bookings");
+  const res = await fetch("/api/bookings?scope=admin", { headers: getAuthHeaders() });
+  if (res.status === 401) {
+    logout();
+    showStatus("Session expired. Please sign in again.", false);
+    return [];
+  }
   if (!res.ok) return [];
   return await res.json();
 }
 
 function catsLabel(row) {
-  const cats = Array.isArray(row.cats) && row.cats.length
-    ? row.cats
-    : row.cat_name
-      ? [{ name: row.cat_name, breed: row.breed, age: row.age }]
-      : [];
-  if (!cats.length) return "-";
-  return cats.map((cat) => `${cat.name || "-"} (${cat.breed || "-"}, ${cat.age ?? "-"}y)`).join("; ");
+  return window.lbCatsLabel(row);
 }
 
 function addOnsLabel(row) {
@@ -506,6 +512,7 @@ function applySettingsToForm(settings) {
   renderSuiteRows(settings.suites || []);
   renderAddonRows(settings.addons || []);
   renderPromoRows(settings.promos || []);
+  whatsappNumberEl.value = settings.contact?.whatsappNumber || "";
 }
 
 function collectSettingsFromForm() {
@@ -518,6 +525,9 @@ function collectSettingsFromForm() {
     suites: collectSuiteRows(),
     addons: collectAddonRows(),
     promos: collectPromoRows(),
+    contact: {
+      whatsappNumber: whatsappNumberEl.value.replace(/\D/g, "").slice(0, 15),
+    },
   };
 }
 
@@ -650,6 +660,7 @@ saveBookingBtn.addEventListener("click", saveSettings);
 saveSuitesBtn.addEventListener("click", saveSettings);
 saveAddonsBtn.addEventListener("click", saveSettings);
 savePromosBtn.addEventListener("click", saveSettings);
+saveContactBtn.addEventListener("click", saveSettings);
 
 function hidePageLoading() {
   const el = document.getElementById("page-loading");

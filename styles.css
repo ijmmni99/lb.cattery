@@ -1,3 +1,32 @@
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("assets/fonts/poppins-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("assets/fonts/poppins-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("assets/fonts/poppins-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("assets/fonts/poppins-700.woff2") format("woff2");
+}
+
 :root {
   --brand-bg: #f7e6bf;
   --brand-paper: #fffaf0;
@@ -7,6 +36,8 @@
   --brand-primary-dark: #d79c35;
   --brand-success: #4caf50;
   --brand-border: #e9c97d;
+  --brand-on-primary: #5c3a0c;
+  --brand-accent-text: #7a4f12;
   --shadow-soft: 0 14px 34px rgba(138, 90, 31, 0.16);
 }
 
@@ -184,7 +215,8 @@ body {
 h1,
 h2,
 h3 {
-  font-family: "Peach Sunday", "Baloo 2", "Trebuchet MS", cursive;
+  font-family: "Poppins", "Trebuchet MS", sans-serif;
+  font-weight: 700;
   line-height: 1.1;
 }
 
@@ -203,7 +235,7 @@ h1 {
 }
 
 .nav-link-row a {
-  color: var(--brand-primary-dark);
+  color: var(--brand-accent-text);
   font-weight: 700;
 }
 
@@ -320,7 +352,7 @@ button {
   font-weight: 700;
   cursor: pointer;
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--brand-on-primary);
   transition: transform 140ms ease, background-color 140ms ease;
   min-height: 44px;
 }
@@ -545,7 +577,7 @@ button.secondary {
   margin: 0.15rem 0 0;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--brand-primary-dark);
+  color: var(--brand-accent-text);
 }
 
 .status {
@@ -662,76 +694,6 @@ button.secondary {
 .calendar-day.day-active {
   border-color: var(--brand-primary-dark);
   box-shadow: 0 0 0 2px rgba(215, 156, 53, 0.35);
-}
-
-.calendar-popover {
-  position: fixed;
-  z-index: 60;
-  width: 240px;
-  max-width: calc(100vw - 1.2rem);
-  background: var(--brand-paper);
-  border: 1px solid var(--brand-border);
-  border-radius: 14px;
-  box-shadow: var(--shadow-soft);
-  padding: 0.7rem 0.85rem;
-  font-size: 0.82rem;
-  color: var(--brand-ink);
-  animation: reveal 160ms ease-out;
-}
-
-.calendar-popover[hidden] {
-  display: none;
-}
-
-.calendar-popover h4 {
-  margin: 0 0.6rem 0.4rem 0;
-  font-size: 0.88rem;
-}
-
-.calendar-popover .popover-total {
-  margin: 0 0 0.4rem;
-  font-weight: 700;
-  color: var(--brand-muted);
-}
-
-.calendar-popover .popover-empty {
-  margin: 0;
-  color: var(--brand-muted);
-}
-
-.calendar-popover ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.32rem;
-}
-
-.calendar-popover li {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 1px dashed var(--brand-border);
-}
-
-.calendar-popover li:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.calendar-popover .popover-close {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.5rem;
-  border: none;
-  background: none;
-  font-size: 1.05rem;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--brand-muted);
-  padding: 0.15rem 0.35rem;
 }
 
 .contact-grid {
@@ -1026,7 +988,7 @@ th {
 
 .admin-nav-btn.active {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--brand-on-primary);
   border-color: transparent;
 }
 
@@ -1050,7 +1012,7 @@ th {
 
 .booking-subtab-btn.active {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--brand-on-primary);
   border-color: transparent;
 }
 
@@ -1210,7 +1172,7 @@ th {
 
 .auth-tab.active {
   background: var(--brand-primary-dark);
-  color: #fff;
+  color: var(--brand-on-primary);
   border: 0;
 }
 
@@ -1538,4 +1500,201 @@ th {
     transform: scale(1.2);
     transform-origin: left center;
   }
+}
+
+/* Calendar loading skeleton */
+.availability-calendar.is-loading .calendar-day.skeleton {
+  min-height: 3rem;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--brand-border) 25%, var(--brand-paper) 50%, var(--brand-border) 75%);
+  background-size: 200% 100%;
+  animation: calendar-shimmer 1.2s linear infinite;
+  opacity: 0.6;
+}
+
+@keyframes calendar-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .availability-calendar.is-loading .calendar-day.skeleton { animation: none; }
+}
+
+/* Install prompts */
+.install-banner {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: calc(100vw - 32px);
+  padding: 0.5rem 0.75rem;
+  background: var(--brand-paper);
+  border: 2px solid var(--brand-primary-dark);
+  border-radius: 999px;
+  box-shadow: var(--shadow-soft);
+}
+
+.install-banner[hidden] {
+  display: none;
+}
+
+.install-banner .install-btn {
+  padding: 0.4rem 1rem;
+}
+
+.install-dismiss {
+  padding: 0.1rem 0.5rem;
+  background: transparent;
+  color: var(--brand-ink);
+  border: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+/* Calendar selection */
+.calendar-day:disabled {
+  cursor: not-allowed;
+  background: #ececec;
+  border-color: #d4d4d4;
+  color: #6b6b6b;
+}
+
+.calendar-day.sel-start,
+.calendar-day.sel-end {
+  color: var(--brand-on-primary);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary-dark);
+  font-weight: 700;
+}
+
+.calendar-day.sel-range {
+  background: #ffe8b0;
+  border-color: var(--brand-primary-dark);
+}
+
+.calendar-hint {
+  margin: 0.5rem 0 0;
+  color: var(--brand-muted);
+  font-size: 0.82rem;
+}
+
+/* Form errors and confirmation */
+.form-errors:empty {
+  display: none;
+}
+
+.form-errors {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #b3261e;
+  border-radius: 10px;
+  background: #fdecea;
+  color: #8c1d18;
+  font-size: 0.88rem;
+}
+
+.form-errors ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: #b3261e;
+}
+
+.vaccination-fields {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+}
+
+.vaccination-fields .check-inline {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.booking-confirmation[hidden] {
+  display: none;
+}
+
+.confirm-id-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.confirm-id {
+  padding: 0.4rem 0.8rem;
+  border: 2px dashed var(--brand-primary-dark);
+  border-radius: 10px;
+  background: var(--brand-paper);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.button-link {
+  display: inline-block;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  border: 2px solid var(--brand-primary-dark);
+  background: var(--brand-primary);
+  color: var(--brand-on-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.button-link.whatsapp {
+  background: #1f7a43;
+  border-color: #1f7a43;
+  color: #fff;
+}
+
+.whatsapp-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  background: #1f7a43;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow-soft);
+}
+
+.whatsapp-fab:focus-visible,
+.button-link:focus-visible {
+  outline: 3px solid var(--brand-ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .whatsapp-fab-label {
+    display: none;
+  }
+}
+
+/* Links inside page content use the darker accent for contrast */
+.contact-item a,
+.map-link {
+  color: var(--brand-accent-text);
 }

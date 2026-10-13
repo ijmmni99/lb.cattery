@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "./_common.js";
+
 function toBase64Url(input) {
   const base64 = btoa(input);
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -38,7 +40,7 @@ export async function verifyAdminToken(token, secret) {
 
   const [payload, signature] = parts;
   const expectedSig = await sha256Base64Url(`${payload}.${secret}`);
-  if (signature !== expectedSig) return false;
+  if (!timingSafeEqual(signature, expectedSig)) return false;
 
   try {
     const raw = fromBase64Url(payload);
@@ -63,6 +65,14 @@ export function getAdminTokenFromRequest(request) {
   return "";
 }
 
+// No fallbacks: a missing secret means the server is not configured.
 export function getAdminSecret(env) {
-  return env.ADMIN_TOKEN_SECRET || env.ADMIN_API_KEY || env.SUPABASE_ANON_KEY || "";
+  return env.ADMIN_TOKEN_SECRET || "";
+}
+
+// Resolves to true only when the request carries a valid admin token. Caller must check getAdminSecret first.
+export async function isAdminRequest(request, env) {
+  const secret = getAdminSecret(env);
+  if (!secret) return false;
+  return verifyAdminToken(getAdminTokenFromRequest(request), secret);
 }
