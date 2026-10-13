@@ -608,6 +608,17 @@ function isCalendarDayDisabled(dateIso, suiteType, bookings) {
   return !isNightFree(dateIso, suiteType, bookings, newCats);
 }
 
+function bookingCountForDate(dateIso, suiteType, allBookings) {
+  return catsOnNight(dateIso, suiteType, allBookings);
+}
+
+function dayClassByCount(count, suiteType) {
+  const cap = getSuiteCapacityMap()[suiteType] || 1;
+  if (count >= cap) return "full";
+  if (count > 0) return "limited";
+  return "available";
+}
+
 function showCalendarSkeleton() {
   calendarEl.classList.add("is-loading");
   calendarEl.setAttribute("aria-busy", "true");

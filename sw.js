@@ -29,13 +29,27 @@ const PRECACHE_URLS = [
   "/assets/logo-256.jpg",
 ];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS.map((url) => new Request(url, { cache: "reload" }))))
-      .then(() => self.skipWaiting()),
+// Cloudflare Pages redirects /page.html to /page. A redirected response cannot be served to a navigation
+// request, so store a copy without the "redirected" flag.
+async function cleanResponse(response) {
+  if (!response.redirected) return response;
+  const body = await response.blob();
+  return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
+async function precache() {
+  const cache = await caches.open(CACHE_NAME);
+  await Promise.all(
+    PRECACHE_URLS.map(async (url) => {
+      const response = await fetch(new Request(url, { cache: "reload" }));
+      if (!response.ok) throw new Error(`precache failed for ${url}: ${response.status}`);
+      await cache.put(url, await cleanResponse(response));
+    }),
   );
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(precache().then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
@@ -60,8 +74,8 @@ async function staleWhileRevalidate(request, event) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request, { ignoreSearch: request.mode === "navigate" });
   const network = fetch(request)
-    .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
+    .then(async (response) => {
+      if (response.ok) await cache.put(request, await cleanResponse(response.clone()));
       return response;
     })
     .catch(() => null);

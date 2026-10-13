@@ -36,6 +36,8 @@
   --brand-primary-dark: #d79c35;
   --brand-success: #4caf50;
   --brand-border: #e9c97d;
+  --brand-on-primary: #5c3a0c;
+  --brand-accent-text: #7a4f12;
   --shadow-soft: 0 14px 34px rgba(138, 90, 31, 0.16);
 }
 
@@ -233,7 +235,7 @@ h1 {
 }
 
 .nav-link-row a {
-  color: var(--brand-primary-dark);
+  color: var(--brand-accent-text);
   font-weight: 700;
 }
 
@@ -350,7 +352,7 @@ button {
   font-weight: 700;
   cursor: pointer;
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--brand-on-primary);
   transition: transform 140ms ease, background-color 140ms ease;
   min-height: 44px;
 }
@@ -575,7 +577,7 @@ button.secondary {
   margin: 0.15rem 0 0;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--brand-primary-dark);
+  color: var(--brand-accent-text);
 }
 
 .status {
@@ -986,7 +988,7 @@ th {
 
 .admin-nav-btn.active {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--brand-on-primary);
   border-color: transparent;
 }
 
@@ -1010,7 +1012,7 @@ th {
 
 .booking-subtab-btn.active {
   background: var(--brand-primary);
-  color: #fff;
+  color: var(--brand-on-primary);
   border-color: transparent;
 }
 
@@ -1170,7 +1172,7 @@ th {
 
 .auth-tab.active {
   background: var(--brand-primary-dark);
-  color: #fff;
+  color: var(--brand-on-primary);
   border: 0;
 }
 
@@ -1565,6 +1567,7 @@ th {
 
 .calendar-day.sel-start,
 .calendar-day.sel-end {
+  color: var(--brand-on-primary);
   background: var(--brand-primary);
   border-color: var(--brand-primary-dark);
   font-weight: 700;
@@ -1650,7 +1653,7 @@ textarea[aria-invalid="true"] {
   border-radius: 999px;
   border: 2px solid var(--brand-primary-dark);
   background: var(--brand-primary);
-  color: var(--brand-ink);
+  color: var(--brand-on-primary);
   font-weight: 700;
   text-decoration: none;
 }
@@ -1688,4 +1691,10 @@ textarea[aria-invalid="true"] {
   .whatsapp-fab-label {
     display: none;
   }
+}
+
+/* Links inside page content use the darker accent for contrast */
+.contact-item a,
+.map-link {
+  color: var(--brand-accent-text);
 }
