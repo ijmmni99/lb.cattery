@@ -1588,3 +1588,39 @@ th {
 @media (prefers-reduced-motion: reduce) {
   .availability-calendar.is-loading .calendar-day.skeleton { animation: none; }
 }
+
+/* Install prompts */
+.install-banner {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: calc(100vw - 32px);
+  padding: 0.5rem 0.75rem;
+  background: var(--brand-paper);
+  border: 2px solid var(--brand-primary-dark);
+  border-radius: 999px;
+  box-shadow: var(--shadow-soft);
+}
+
+.install-banner[hidden] {
+  display: none;
+}
+
+.install-banner .install-btn {
+  padding: 0.4rem 1rem;
+}
+
+.install-dismiss {
+  padding: 0.1rem 0.5rem;
+  background: transparent;
+  color: var(--brand-ink);
+  border: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}

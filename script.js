@@ -169,9 +169,8 @@ async function saveBooking(booking) {
 }
 
 async function getSettings() {
-  const res = await fetch("/api/settings");
-  if (!res.ok) return structuredClone(DEFAULT_SETTINGS);
-  const data = await res.json();
+  const data = await window.lbFetchSettings();
+  if (!data) return structuredClone(DEFAULT_SETTINGS);
   return normalizeSettings(data);
 }
 
@@ -1004,7 +1003,72 @@ function refreshFormFromSettings() {
   }
 }
 
+// ---- PWA: service worker + install prompts ----------------------------------
+
+function safeStorage(action) {
+  try {
+    return action(window.localStorage);
+  } catch {
+    return null;
+  }
+}
+
+function setupPwa() {
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch((err) => console.error("service worker registration failed", err));
+    });
+  }
+
+  const banner = document.getElementById("install-banner");
+  const installBtn = document.getElementById("install-btn");
+  const dismissBtn = document.getElementById("install-dismiss");
+  const iosHint = document.getElementById("ios-install-hint");
+  const iosDismiss = document.getElementById("ios-hint-dismiss");
+  let deferredPrompt = null;
+
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  if (isStandalone) return;
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    if (safeStorage((s) => s.getItem("lb_install_dismissed"))) return;
+    deferredPrompt = event;
+    banner.hidden = false;
+  });
+
+  installBtn?.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    banner.hidden = true;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice.catch(() => null);
+    deferredPrompt = null;
+  });
+
+  dismissBtn?.addEventListener("click", () => {
+    banner.hidden = true;
+    safeStorage((s) => s.setItem("lb_install_dismissed", "1"));
+  });
+
+  window.addEventListener("appinstalled", () => {
+    banner.hidden = true;
+  });
+
+  const ua = window.navigator.userAgent;
+  const isIos = /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua);
+  if (isIos && isSafari && !safeStorage((s) => s.getItem("lb_ios_hint_seen"))) {
+    iosHint.hidden = false;
+    safeStorage((s) => s.setItem("lb_ios_hint_seen", "1"));
+    iosDismiss?.addEventListener("click", () => {
+      iosHint.hidden = true;
+    });
+  }
+}
+
 async function init() {
+  setupPwa();
+
   // Render immediately from defaults; no blocking overlay.
   renderSelectOptions();
   resetCatRows();
