@@ -294,7 +294,12 @@ async function fetchSettings() {
 }
 
 async function fetchBookings() {
-  const res = await fetch("/api/bookings");
+  const res = await fetch("/api/bookings?scope=admin", { headers: getAuthHeaders() });
+  if (res.status === 401) {
+    logout();
+    showStatus("Session expired. Please sign in again.", false);
+    return [];
+  }
   if (!res.ok) return [];
   return await res.json();
 }

@@ -1,173 +1,54 @@
-import { getAdminSecret, getAdminTokenFromRequest, verifyAdminToken } from "./_adminAuth.js";
-
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-token, x-admin-key, authorization",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Content-Type": "application/json",
-};
-
-const DEFAULT_SETTINGS = {
-  booking: {
-    allowPublicBooking: true,
-    minNights: 1,
-    maxNights: 30,
-  },
-  suites: [
-    { code: "standard", name: "Standard Suite", nightlyRate: 20, capacity: 6, imageUrl: "", active: true },
-    { code: "deluxe", name: "Deluxe Suite", nightlyRate: 35, capacity: 4, imageUrl: "", active: true },
-    { code: "royal", name: "Royal Suite", nightlyRate: 55, capacity: 2, imageUrl: "", active: true },
-  ],
-  addons: [
-    { code: "grooming", name: "Grooming Package", flatFee: 18, nightlyFee: 0, active: true },
-    { code: "playtime", name: "Extended Playtime", flatFee: 0, nightlyFee: 10, active: true },
-    { code: "medication", name: "Medication Support", flatFee: 12, nightlyFee: 0, active: true },
-  ],
-  promos: [],
-};
-
-function sanitizeSettings(input) {
-  const safe = input && typeof input === "object" ? input : {};
-  const booking = safe.booking && typeof safe.booking === "object" ? safe.booking : {};
-
-  const suites = Array.isArray(safe.suites) ? safe.suites : [];
-  const addons = Array.isArray(safe.addons) ? safe.addons : [];
-  const promos = Array.isArray(safe.promos) ? safe.promos : [];
-
-  return {
-    booking: {
-      allowPublicBooking: booking.allowPublicBooking !== false,
-      minNights: Number(booking.minNights) > 0 ? Number(booking.minNights) : 1,
-      maxNights: Number(booking.maxNights) > 0 ? Number(booking.maxNights) : 30,
-    },
-    suites: suites
-      .map((suite) => ({
-        code: String(suite.code || "").trim(),
-        name: String(suite.name || "").trim(),
-        nightlyRate: Number(suite.nightlyRate) || 0,
-        capacity: Math.max(1, Number(suite.capacity) || 1),
-        imageUrl: String(suite.imageUrl || "").trim().slice(0, 2000),
-        active: suite.active !== false,
-      }))
-      .filter((suite) => suite.code && suite.name),
-    addons: addons
-      .map((addon) => ({
-        code: String(addon.code || "").trim(),
-        name: String(addon.name || "").trim(),
-        flatFee: Number(addon.flatFee) || 0,
-        nightlyFee: Number(addon.nightlyFee) || 0,
-        active: addon.active !== false,
-      }))
-      .filter((addon) => addon.code && addon.name),
-    promos: promos
-      .map((promo) => ({
-        imageUrl: String(promo.imageUrl || "").trim().slice(0, 2000),
-        caption: String(promo.caption || "").trim().slice(0, 200),
-        linkUrl: String(promo.linkUrl || "").trim().slice(0, 2000),
-        active: promo.active !== false,
-      }))
-      .filter((promo) => promo.imageUrl),
-  };
-}
-
-async function readSettings(base, headers) {
-  const res = await fetch(`${base}?key=eq.global&select=value&limit=1`, { headers });
-  if (!res.ok) {
-    return DEFAULT_SETTINGS;
-  }
-
-  const rows = await res.json();
-  if (!Array.isArray(rows) || rows.length === 0 || !rows[0].value) {
-    return DEFAULT_SETTINGS;
-  }
-
-  const merged = {
-    ...DEFAULT_SETTINGS,
-    ...rows[0].value,
-  };
-
-  return sanitizeSettings(merged);
-}
+import { getAdminSecret, isAdminRequest } from "./_adminAuth.js";
+import { corsHeaders, json, notConfigured, supabaseHeaders } from "./_common.js";
+import { loadSettings, sanitizeSettings } from "./_settings.js";
 
 export async function onRequest({ request, env }) {
+  const cors = corsHeaders(request, env, { headers: "Content-Type, x-admin-token, authorization" });
+
   if (request.method === "OPTIONS") {
-    return new Response(null, { headers: CORS });
+    return new Response(null, { headers: cors });
   }
 
-  const { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, ADMIN_API_KEY } = env;
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return new Response(JSON.stringify({ error: "Missing Supabase env vars" }), { status: 500, headers: CORS });
-  }
+  const auth = supabaseHeaders(env);
+  if (!auth) return notConfigured(cors);
 
-  const base = `${SUPABASE_URL}/rest/v1/system_config`;
-  const restKey = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
-  const auth = {
-    apikey: restKey,
-    Authorization: `Bearer ${restKey}`,
-    "Content-Type": "application/json",
-  };
+  const base = `${env.SUPABASE_URL}/rest/v1/system_config`;
 
   if (request.method === "GET") {
-    const settings = await readSettings(base, auth);
+    const { settings, exists, ok } = await loadSettings(env, auth);
 
-    // Auto-bootstrap default row if table exists but no record has been created yet.
-    await fetch(base, {
-      method: "POST",
-      headers: {
-        ...auth,
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify({
-        key: "global",
-        value: settings,
-        updated_at: new Date().toISOString(),
-      }),
-    }).catch(() => null);
+    // Auto-bootstrap the default row once, if the table exists but no record has been created yet.
+    if (ok && !exists) {
+      await fetch(base, {
+        method: "POST",
+        headers: { ...auth, Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ key: "global", value: settings, updated_at: new Date().toISOString() }),
+      }).catch(() => null);
+    }
 
-    return new Response(JSON.stringify(settings), { headers: CORS });
+    return json(cors, settings);
   }
 
   if (request.method === "POST") {
-    const adminSecret = getAdminSecret(env);
-    const token = getAdminTokenFromRequest(request);
-    const isTokenValid = await verifyAdminToken(token, adminSecret);
+    if (!getAdminSecret(env)) return notConfigured(cors);
+    if (!(await isAdminRequest(request, env))) return json(cors, { error: "Unauthorized" }, 401);
 
-    const expectedAdminKey = ADMIN_API_KEY || SUPABASE_ANON_KEY;
-    const providedKey = request.headers.get("x-admin-key") || "";
-    const isLegacyKeyValid = Boolean(expectedAdminKey && providedKey === expectedAdminKey);
-
-    if (!isTokenValid && !isLegacyKeyValid) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: CORS });
-    }
-
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const settings = sanitizeSettings(body);
-
-    const upsertPayload = {
-      key: "global",
-      value: settings,
-      updated_at: new Date().toISOString(),
-    };
 
     const res = await fetch(base, {
       method: "POST",
-      headers: {
-        ...auth,
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      },
-      body: JSON.stringify(upsertPayload),
+      headers: { ...auth, Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ key: "global", value: settings, updated_at: new Date().toISOString() }),
     });
 
     if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      return new Response(
-        JSON.stringify({ error: "Failed to save settings", status: res.status, detail }),
-        { status: 500, headers: CORS },
-      );
+      console.error("save settings failed", res.status, await res.text().catch(() => ""));
+      return json(cors, { error: "Failed to save settings" }, 500);
     }
 
-    return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+    return json(cors, { ok: true });
   }
 
-  return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: CORS });
+  return json(cors, { error: "Not found" }, 404);
 }

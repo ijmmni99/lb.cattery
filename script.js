@@ -116,41 +116,32 @@ function getSuiteCapacityMap() {
 }
 
 async function getBookings() {
-  const res = await fetch("/api/bookings");
-  if (!res.ok) {
-    console.error("getBookings failed", res.status);
+  try {
+    const res = await fetch("/api/bookings");
+    if (!res.ok) {
+      console.error("getBookings failed", res.status);
+      return [];
+    }
+    const data = await res.json();
+    return data.map((r) => ({
+      suiteType: r.suite_type,
+      checkIn: r.check_in,
+      checkOut: r.check_out,
+      catCount: Math.max(1, Number(r.cats) || 1),
+      status: r.status,
+    }));
+  } catch (err) {
+    console.error("getBookings failed", err);
     return [];
   }
-  const data = await res.json();
-  return data.map((r) => ({
-    id: r.id,
-    ownerName: r.owner_name,
-    ownerEmail: r.owner_email,
-    ownerPhone: r.owner_phone,
-    cats: Array.isArray(r.cats) && r.cats.length
-      ? r.cats
-      : r.cat_name
-        ? [{ name: r.cat_name, breed: r.breed, age: r.age }]
-        : [],
-    suiteType: r.suite_type,
-    checkIn: r.check_in,
-    checkOut: r.check_out,
-    addOns: Array.isArray(r.add_ons) && r.add_ons.length
-      ? r.add_ons
-      : r.add_on
-        ? [r.add_on]
-        : [],
-    totalPrice: r.total_price,
-    notes: r.notes,
-  }));
 }
 
+// The server generates the id and price; the client only sends the stay details.
 async function saveBooking(booking) {
   const res = await fetch("/api/bookings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      id: booking.id,
       owner_name: booking.ownerName,
       owner_email: booking.ownerEmail,
       owner_phone: booking.ownerPhone,
@@ -159,14 +150,14 @@ async function saveBooking(booking) {
       check_in: booking.checkIn,
       check_out: booking.checkOut,
       add_ons: booking.addOns,
-      total_price: booking.totalPrice,
       notes: booking.notes || null,
     }),
   });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error("saveBooking failed", res.status);
-    throw new Error("Booking save failed");
+    throw new Error(data.error || "Booking save failed");
   }
+  return data;
 }
 
 async function getSettings() {
@@ -498,13 +489,27 @@ function datesOverlap(aStart, aEnd, bStart, bEnd) {
   return startA < endB && endA > startB;
 }
 
-async function isDateRangeAvailable(start, end, suiteType, currentBookings = null) {
-  const suiteCapacity = getSuiteCapacityMap();
+function catsOnNight(dateIso, suiteType, allBookings) {
+  return allBookings
+    .filter((booking) => booking.suiteType === suiteType && dateIso >= booking.checkIn && dateIso < booking.checkOut)
+    .reduce((sum, booking) => sum + booking.catCount, 0);
+}
+
+function eachNightIso(start, end) {
+  const nights = [];
+  const cursor = parseDate(start);
+  const stop = parseDate(end);
+  while (cursor < stop) {
+    nights.push(isoDateFromParts(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return nights;
+}
+
+async function isDateRangeAvailable(start, end, suiteType, currentBookings = null, newCats = 1) {
+  const capacity = getSuiteCapacityMap()[suiteType] || 1;
   const bookings = currentBookings ?? await getBookings();
-  const overlapsInSuite = bookings.filter(
-    (booking) => booking.suiteType === suiteType && datesOverlap(start, end, booking.checkIn, booking.checkOut),
-  ).length;
-  return overlapsInSuite < (suiteCapacity[suiteType] || 1);
+  return eachNightIso(start, end).every((night) => catsOnNight(night, suiteType, bookings) + newCats <= capacity);
 }
 
 function calculateEstimate(formData, addOnCodes = [], catCount = 1) {
@@ -534,9 +539,7 @@ function isoDateFromParts(year, month, day) {
 }
 
 function bookingCountForDate(dateIso, suiteType, allBookings) {
-  return allBookings.filter(
-    (booking) => booking.suiteType === suiteType && dateIso >= booking.checkIn && dateIso < booking.checkOut,
-  ).length;
+  return catsOnNight(dateIso, suiteType, allBookings);
 }
 
 function dayClassByCount(count, suiteType) {
@@ -588,7 +591,7 @@ async function renderAvailabilityCalendar() {
     dayEl.setAttribute("aria-haspopup", "dialog");
     dayEl.setAttribute(
       "aria-label",
-      `${formatDateLong(isoDate)}: ${count > 0 ? `${count} booking${count > 1 ? "s" : ""}` : "no bookings"}. Tap for summary.`,
+      `${formatDateLong(isoDate)}: ${count > 0 ? `${count} cat${count > 1 ? "s" : ""} booked` : "no bookings"}. Tap for summary.`,
     );
 
     const dayNum = document.createElement("strong");
@@ -614,12 +617,14 @@ function formatDateLong(dateIso) {
 function bookingsSummaryForDate(dateIso, allBookings) {
   const matches = allBookings.filter((booking) => dateIso >= booking.checkIn && dateIso < booking.checkOut);
   const bySuite = new Map();
+  let total = 0;
   matches.forEach((booking) => {
     const suite = suiteByCode(booking.suiteType);
     const label = suite ? suite.name : booking.suiteType;
-    bySuite.set(label, (bySuite.get(label) || 0) + 1);
+    bySuite.set(label, (bySuite.get(label) || 0) + booking.catCount);
+    total += booking.catCount;
   });
-  return { total: matches.length, bySuite };
+  return { total, bySuite };
 }
 
 function closeCalendarPopover() {
@@ -669,7 +674,7 @@ function renderCalendarPopover(dateIso, anchorEl) {
   } else {
     const summaryLine = document.createElement("p");
     summaryLine.className = "popover-total";
-    summaryLine.textContent = `${total} booking${total > 1 ? "s" : ""} total`;
+    summaryLine.textContent = `${total} cat${total > 1 ? "s" : ""} booked`;
 
     const list = document.createElement("ul");
     bySuite.forEach((count, label) => {
@@ -677,7 +682,7 @@ function renderCalendarPopover(dateIso, anchorEl) {
       const name = document.createElement("span");
       name.textContent = label;
       const num = document.createElement("span");
-      num.textContent = `${count} booking${count > 1 ? "s" : ""}`;
+      num.textContent = `${count} cat${count > 1 ? "s" : ""}`;
       li.append(name, num);
       list.appendChild(li);
     });
@@ -789,7 +794,7 @@ async function validateBookingRules() {
   }
 
   const bookings = await getBookings();
-  if (!(await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings))) {
+  if (!(await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings, collectCats().length || 1))) {
     alert("Those dates are currently unavailable. Please choose another range.");
     return false;
   }
@@ -874,15 +879,18 @@ bookingForm.addEventListener("submit", async (event) => {
   const formData = Object.fromEntries(new FormData(bookingForm).entries());
   const addOns = collectAddOns();
   const cats = collectCats();
-  const booking = {
-    ...formData,
-    cats,
-    addOns,
-    id: `LB-${Date.now().toString().slice(-6)}`,
-    totalPrice: calculateEstimate(formData, addOns, cats.length),
-  };
+  const booking = { ...formData, cats, addOns };
 
-  await saveBooking(booking);
+  let saved;
+  try {
+    saved = await saveBooking(booking);
+  } catch (err) {
+    showAvailabilityMessage(err.message || "Could not save your booking. Please try again.", false);
+    alert(err.message || "Could not save your booking. Please try again.");
+    await renderAvailabilityCalendar();
+    return;
+  }
+
   availabilitySuite.value = formData.suiteType;
   bookingForm.reset();
   resetCatRows();
@@ -890,7 +898,7 @@ bookingForm.addEventListener("submit", async (event) => {
   showStep(0);
   await renderAvailabilityCalendar();
   showAvailabilityMessage(
-    `Booking submitted. Booking ID: ${booking.id} — we'll review it and email ${booking.ownerEmail} once it's confirmed. Keep the ID to look up this booking later.`,
+    `Booking submitted. Booking ID: ${saved.id} — we'll review it and email ${booking.ownerEmail} once it's confirmed. Keep the ID to look up this booking later.`,
     true,
   );
 });
@@ -919,7 +927,7 @@ checkAvailabilityBtn.addEventListener("click", async () => {
     return;
   }
 
-  const available = await isDateRangeAvailable(start, end, suiteType);
+  const available = await isDateRangeAvailable(start, end, suiteType, null, 1);
   if (available) {
     showAvailabilityMessage("Great news. Those dates are currently available.", true);
   } else {

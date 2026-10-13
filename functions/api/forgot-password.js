@@ -1,26 +1,7 @@
+import { corsHeaders, notConfigured, rateLimit, supabaseHeaders } from "./_common.js";
 import { generateRandomToken, hashPassword, hashValue } from "./_sessionAuth.js";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Content-Type": "application/json",
-};
-
 const RESET_TTL_MS = 30 * 60 * 1000;
-
-function getUserSecret(env) {
-  return env.USER_TOKEN_SECRET || env.SUPABASE_ANON_KEY || "";
-}
-
-function getSupabaseAuth(env) {
-  const restKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
-  return {
-    apikey: restKey,
-    Authorization: `Bearer ${restKey}`,
-    "Content-Type": "application/json",
-  };
-}
 
 function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
@@ -52,6 +33,8 @@ async function sendResetEmail(env, email, resetUrl) {
 }
 
 export async function onRequest({ request, env }) {
+  const CORS = corsHeaders(request, env, { methods: "POST, OPTIONS" });
+
   if (request.method === "OPTIONS") {
     return new Response(null, { headers: CORS });
   }
@@ -60,17 +43,14 @@ export async function onRequest({ request, env }) {
     return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: CORS });
   }
 
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-    return new Response(JSON.stringify({ error: "Missing Supabase env vars" }), { status: 500, headers: CORS });
-  }
+  const auth = supabaseHeaders(env);
+  const userSecret = env.USER_TOKEN_SECRET || "";
+  if (!auth || !userSecret || !env.RESEND_API_KEY) return notConfigured(CORS);
 
-  if (!env.RESEND_API_KEY) {
-    return new Response(JSON.stringify({ error: "Missing RESEND_API_KEY env var" }), { status: 500, headers: CORS });
-  }
+  const limited = await rateLimit(request, env, "forgot-password", CORS);
+  if (limited) return limited;
 
   const usersBase = `${env.SUPABASE_URL}/rest/v1/app_users`;
-  const auth = getSupabaseAuth(env);
-  const userSecret = getUserSecret(env);
 
   const body = await request.json().catch(() => null);
   const action = String(body?.action || "").trim().toLowerCase();
@@ -136,7 +116,7 @@ export async function onRequest({ request, env }) {
       return new Response(JSON.stringify({ error: "Reset link is invalid or has expired" }), { status: 400, headers: CORS });
     }
 
-    const passwordHash = await hashPassword(password, userSecret);
+    const passwordHash = await hashPassword(password, env);
 
     const updateRes = await fetch(`${usersBase}?id=eq.${encodeURIComponent(user.id)}`, {
       method: "PATCH",
