@@ -4,19 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>L&B Cattery | Booking Lookup</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Poppins:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="preload" href="assets/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="admin-page">
     <header class="site-header">
       <div class="header-top">
         <div class="brand-wrap">
-          <img src="assets/logo-6.jpg" alt="L&B Cattery logo" class="brand-logo" />
+          <picture>
+            <source srcset="assets/logo-256.webp" type="image/webp" />
+            <img src="assets/logo-256.jpg" alt="L&B Cattery logo" class="brand-logo" width="256" height="256" decoding="async" />
+          </picture>
           <div>
             <p class="eyebrow">Booking Lookup</p>
             <h1>Find Your Reservation</h1>
@@ -65,6 +63,6 @@
       </section>
     </main>
 
-    <script src="booking-lookup.js"></script>
+    <script src="booking-lookup.js" defer></script>
   </body>
 </html>

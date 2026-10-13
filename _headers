@@ -1,0 +1,31 @@
+# Cloudflare Pages static headers. Note: _headers does not apply to Pages Functions;
+# /api/* responses set Cache-Control: no-store themselves (see functions/api/_common.js).
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-src https://www.google.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  X-Frame-Options: DENY
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/
+  Cache-Control: public, max-age=300
+
+/*.html
+  Cache-Control: public, max-age=300
+
+/*.css
+  Cache-Control: public, max-age=300
+
+/*.js
+  Cache-Control: public, max-age=300
+
+/manifest.webmanifest
+  Cache-Control: public, max-age=86400
+  Content-Type: application/manifest+json
+
+/api/*
+  Cache-Control: no-store

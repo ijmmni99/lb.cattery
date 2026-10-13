@@ -1,3 +1,32 @@
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("assets/fonts/poppins-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("assets/fonts/poppins-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("assets/fonts/poppins-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("assets/fonts/poppins-700.woff2") format("woff2");
+}
+
 :root {
   --brand-bg: #f7e6bf;
   --brand-paper: #fffaf0;
@@ -184,7 +213,8 @@ body {
 h1,
 h2,
 h3 {
-  font-family: "Peach Sunday", "Baloo 2", "Trebuchet MS", cursive;
+  font-family: "Poppins", "Trebuchet MS", sans-serif;
+  font-weight: 700;
   line-height: 1.1;
 }
 
@@ -1538,4 +1568,23 @@ th {
     transform: scale(1.2);
     transform-origin: left center;
   }
+}
+
+/* Calendar loading skeleton */
+.availability-calendar.is-loading .calendar-day.skeleton {
+  min-height: 3rem;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--brand-border) 25%, var(--brand-paper) 50%, var(--brand-border) 75%);
+  background-size: 200% 100%;
+  animation: calendar-shimmer 1.2s linear infinite;
+  opacity: 0.6;
+}
+
+@keyframes calendar-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .availability-calendar.is-loading .calendar-day.skeleton { animation: none; }
 }

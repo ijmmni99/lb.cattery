@@ -115,6 +115,14 @@ function getSuiteCapacityMap() {
   return Object.fromEntries(settings.suites.filter((suite) => suite.active).map((suite) => [suite.code, Number(suite.capacity) || 1]));
 }
 
+let bookingsCache = null;
+
+// Cached for the page's lifetime; pass force=true after a booking or an explicit refresh.
+async function loadBookings(force = false) {
+  if (!bookingsCache || force) bookingsCache = getBookings();
+  return bookingsCache;
+}
+
 async function getBookings() {
   try {
     const res = await fetch("/api/bookings");
@@ -254,6 +262,7 @@ function renderPromoBanner(promos) {
     img.src = promo.imageUrl;
     img.alt = promo.caption || "Promotion";
     img.loading = "lazy";
+    img.decoding = "async";
 
     if (promo.linkUrl) {
       const link = document.createElement("a");
@@ -330,6 +339,7 @@ function renderSuiteCards(suiteOptions) {
       img.src = suite.imageUrl;
       img.alt = suite.name;
       img.loading = "lazy";
+      img.decoding = "async";
       img.addEventListener("error", () => {
         media.classList.add("suite-card-media-placeholder");
         img.remove();
@@ -508,7 +518,7 @@ function eachNightIso(start, end) {
 
 async function isDateRangeAvailable(start, end, suiteType, currentBookings = null, newCats = 1) {
   const capacity = getSuiteCapacityMap()[suiteType] || 1;
-  const bookings = currentBookings ?? await getBookings();
+  const bookings = currentBookings ?? await loadBookings();
   return eachNightIso(start, end).every((night) => catsOnNight(night, suiteType, bookings) + newCats <= capacity);
 }
 
@@ -550,13 +560,24 @@ function dayClassByCount(count, suiteType) {
   return "available";
 }
 
+function showCalendarSkeleton() {
+  calendarEl.classList.add("is-loading");
+  calendarEl.setAttribute("aria-busy", "true");
+  calendarEl.innerHTML = "";
+  for (let i = 0; i < 35; i += 1) {
+    const cell = document.createElement("div");
+    cell.className = "calendar-day skeleton";
+    calendarEl.appendChild(cell);
+  }
+}
+
 async function renderAvailabilityCalendar() {
   const suiteType = availabilitySuite.value;
   const { year, month } = calendarState;
   const { start, end } = getMonthBounds(year, month);
   const firstWeekday = start.getDay();
   const daysInMonth = end.getDate();
-  const allBookings = await getBookings();
+  const allBookings = await loadBookings();
   calendarBookingsCache = allBookings;
   closeCalendarPopover();
 
@@ -565,6 +586,8 @@ async function renderAvailabilityCalendar() {
     year: "numeric",
   }).format(start);
 
+  calendarEl.classList.remove("is-loading");
+  calendarEl.setAttribute("aria-busy", "false");
   calendarEl.innerHTML = "";
   const weekdayNames = ["S", "M", "T", "W", "T", "F", "S"];
   weekdayNames.forEach((day) => {
@@ -793,7 +816,7 @@ async function validateBookingRules() {
     return false;
   }
 
-  const bookings = await getBookings();
+  const bookings = await loadBookings(true);
   if (!(await isDateRangeAvailable(formData.checkIn, formData.checkOut, formData.suiteType, bookings, collectCats().length || 1))) {
     alert("Those dates are currently unavailable. Please choose another range.");
     return false;
@@ -892,6 +915,7 @@ bookingForm.addEventListener("submit", async (event) => {
   }
 
   availabilitySuite.value = formData.suiteType;
+  await loadBookings(true);
   bookingForm.reset();
   resetCatRows();
   refreshEstimate();
@@ -927,7 +951,7 @@ checkAvailabilityBtn.addEventListener("click", async () => {
     return;
   }
 
-  const available = await isDateRangeAvailable(start, end, suiteType, null, 1);
+  const available = await isDateRangeAvailable(start, end, suiteType, await loadBookings(true), 1);
   if (available) {
     showAvailabilityMessage("Great news. Those dates are currently available.", true);
   } else {
@@ -959,28 +983,50 @@ calNextBtn.addEventListener("click", async () => {
   await renderAvailabilityCalendar();
 });
 
-function hidePageLoading() {
-  const el = document.getElementById("page-loading");
-  if (!el) return;
-  el.classList.add("fade-out");
-  setTimeout(() => {
-    el.hidden = true;
-  }, 220);
+// Re-render options after settings arrive without losing what the visitor already picked.
+function refreshFormFromSettings() {
+  const selectedSuite = bookingForm.querySelector('input[name="suiteType"]:checked')?.value;
+  const checkedAddOns = new Set(collectAddOns());
+  const availabilitySuiteValue = availabilitySuite.value;
+
+  renderSelectOptions();
+
+  const suiteRadio = Array.from(bookingForm.querySelectorAll('input[name="suiteType"]')).find((el) => el.value === selectedSuite);
+  if (suiteRadio) {
+    suiteRadio.checked = true;
+    updateSuiteCardSelection();
+  }
+  Array.from(addonOptionsEl.querySelectorAll('input[name="addOn"]')).forEach((el) => {
+    el.checked = checkedAddOns.has(el.value);
+  });
+  if (Array.from(availabilitySuite.options).some((o) => o.value === availabilitySuiteValue)) {
+    availabilitySuite.value = availabilitySuiteValue;
+  }
 }
 
 async function init() {
-  try {
-    settings = await getSettings();
-    renderSelectOptions();
+  // Render immediately from defaults; no blocking overlay.
+  renderSelectOptions();
+  resetCatRows();
+  applyBookingStatus();
+  refreshEstimate();
+  showStep(0);
+  showCalendarSkeleton();
+
+  // Fire both requests in parallel.
+  const bookingsPromise = loadBookings();
+  const loadedSettings = await getSettings().catch(() => null);
+
+  if (loadedSettings) {
+    settings = loadedSettings;
+    refreshFormFromSettings();
     renderPromoBanner(settings.promos);
-    resetCatRows();
     applyBookingStatus();
     refreshEstimate();
-    showStep(0);
-    await renderAvailabilityCalendar();
-  } finally {
-    hidePageLoading();
   }
+
+  await bookingsPromise;
+  await renderAvailabilityCalendar();
 }
 
 init();

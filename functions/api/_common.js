@@ -9,6 +9,7 @@ export function corsHeaders(request, env, { methods = "GET, POST, OPTIONS", head
     "Access-Control-Allow-Methods": methods,
     Vary: "Origin",
     "Content-Type": "application/json",
+    "Cache-Control": "no-store",
   };
 }
 
